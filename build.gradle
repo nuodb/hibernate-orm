@@ -47,6 +47,7 @@ allprojects {
 				dirs "${System.env.ADDITIONAL_REPO}"
 			}
 		}
+		mavenLocal()
 	}
 	apply plugin: 'idea'
 

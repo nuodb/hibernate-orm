@@ -34,6 +34,8 @@ public class SequenceValueExtractor {
 
 	public SequenceValueExtractor(Dialect dialect, String sequenceName) {
 		this.dialect = dialect;
+		System.err.println(" >> >> >> >> USING DIALECT: " + dialect.getClass());
+
 		if ( dialect instanceof DerbyDialect ) {
 			queryString = "VALUES SYSCS_UTIL.SYSCS_PEEK_AT_SEQUENCE('HIBERNATE_ORM_TEST', '" + sequenceName.toUpperCase() + "')";
 		}
@@ -53,6 +55,10 @@ public class SequenceValueExtractor {
 		else if ( dialect instanceof AbstractHANADialect ) {
 
 			queryString = "select " + sequenceName + ".currval from sys.dummy";
+		}
+		else if ( dialect.getClass().getSimpleName().equals("NuoDBDialect") ) {
+			System.err.println(" >> >> >> >> DIALECT: " + dialect.getClass());
+			queryString = "select cast(next value for " + sequenceName + " as bigint) from dual";
 		}
 		else {
 			queryString = "select currval('" + sequenceName + "');";
