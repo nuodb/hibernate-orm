@@ -35,6 +35,11 @@ plugins {
 
 allprojects {
 	repositories {
+		// Uncomment this to pull our jar from sonatype		
+		maven {
+			name "sonatype"
+			url "https://oss.sonatype.org/content/repositories/comnuodb-1046/"
+		}
 		mavenCentral()
 		maven {
 			name "jboss-snapshots"
@@ -54,6 +59,7 @@ allprojects {
 			}
 		}
 	}
+
 	apply plugin: 'idea'
 
 	// minimize changes, at least for now (gradle uses 'build' by default)..
