@@ -382,7 +382,8 @@ ext {
                     'jdbc.pass'  : 'hibernate_orm_test',
                     'connection.init_sql' : '',
                     'jdbc.url'   : 'jdbc:com.nuodb.hib://' + dbHost + '/hibernate_orm_test?isolation=read_committed&lock-wait-timeout=10',
-                    'jdbc.datasource' : 'com.nuodb.jdbc.Driver'
+                    'jdbc.datasource' : 'com.nuodb.jdbc.Driver',
+                    'hibernate.connection.isolation' : 'READ_COMMITTED'
             ],            
     ]
 }
