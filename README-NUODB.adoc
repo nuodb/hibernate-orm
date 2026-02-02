@@ -5,10 +5,10 @@ image::https://static.jboss.org/hibernate/images/hibernate_logo_whitebkg_200px.p
 
 = Hibernate and NuoDB &nbsp; &nbsp; image:https://d33wubrfki0l68.cloudfront.net/571989f106f60bced5326825bd63918a55bdf0aa/dd52a/_/img/nuodb-bird-only-green.png[width=60]
 
-== 7.0 Branch
+== nuodb/7.0 Branch
 
 This is a fork of Hibernate ORM (http://github.com/hibernate/hibernate-orm).
-We have modified branches 5.6, 6.1, 6.2, 6.6 and 7.0 to allow testing of NuoDB's Hibernate dialect.
+We have created NuoDB versions of branches 5.6, 6.1, 6.2, 6.6, 7.0 and 7.2 to allow testing of NuoDB's Hibernate dialect.
 
 The tests of interest are the profile tests in `hibernate-core` sub-project (which allow testing against multiple databases).
 
@@ -21,7 +21,7 @@ IMPORTANT: If the NuoDB Hibernate JAR version changes, edit this README and chan
 
 To run the tests for NuoDB:
 
-. Checkout branch 7.0 or 7.1 as needed.
+. Checkout branch nuodb/7.0 or nuodb/7.2 as needed.
 
 . Windows users are recommended to use `git bash` or WSL rather than `CMD` or _PowerShell_.
 
@@ -280,8 +280,7 @@ To use NuoDB:
 
 . Modified `build.gradle` in two places to look in the local maven repository (`.m2` in your home directory) for our dialect.
 
-. Modified `local-build-plugins/src/main/groovy/databases.gradle` to add NuoDB and its connection properties to the `dbBundle` array.
-The properties must match those in `databases/nuodb/resources/hibernate.properties`.
+. Modified `local-build-plugins/src/main/groovy/local.databases.gradle` to add NuoDB and its connection properties to the `dbBundle` array.
 
 . Modified `hibernate-testing/hibernate-testing.gradle`:
 * To look in the local maven repository for our dialect.

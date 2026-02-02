@@ -65,7 +65,7 @@ println  "    user.dir: ${System.getProperty("user.dir")}";
 println  "    JDBC JAR: nuodb-jdbc-${nuodbJdbcJarVersion}"
 
 var checker = new CheckNuoDBDatabaseAndVersion();
-checker.check(nuodbJdbcJarVersion);
+checker.check(nuodbJdbcJarVersion, project.projectDir);
 checker.checkDatabase(new File(project.rootDir , 
       'local-build-plugins/src/main/groovy/local.databases.gradle'));
 
@@ -244,9 +244,10 @@ public class CheckNuoDBDatabaseAndVersion {
 	public SimpleDatabaseVersion nuodbDatabaseVersion;
 
 	/**
-	 * Look for JAR dependencies
+	 * Look for JAR dependencies - these tests take ages to compile and run. 
+	 * This code attempts to find any obvious errors up front.
 	 */
-	public void check(var nuodbJdbcJarVersion) {
+	public void check(var nuodbJdbcJarVersion, testDirectory) {
 		// Find Maven repository directory
 		String repoPath = System.getenv("ADDITIONAL_REPO");
 
@@ -277,6 +278,38 @@ public class CheckNuoDBDatabaseAndVersion {
 		if (!expectedVersion.equals(nuodbHibernateJarVersion))
 			throw new RuntimeException(
 					"DIALECT_VERSION set to " + expectedVersion + ", but version not found in Maven repo");
+
+		// The changelog's first line defines the Hibernate version. Does it match the NuoDB JAR?
+		File changelogFile = new File(testDirectory, "changelog.txt");
+
+		if (!changelogFile.exists()) {
+				println("BUILD WARNING: Unable to find the project's 'changelog.txt' to confirm Hibernate version." 
+					+ " Make sure that DIALECT_VERSION is correct." )
+		}
+		else {
+			java.util.List lines = java.nio.file.Files.readAllLines(changelogFile.toPath());
+			String line1 = lines.get(0);
+			java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("Hibernate (\\d+) Changelog").matcher(line1);
+
+			if (matcher.matches()) {
+				String majorVersionFromDir = matcher.group(1);
+				println "These tests are for Hibernate " + majorVersionFromDir;
+
+				// Get the version the JAR expects
+				String majorVersion = org.apache.commons.lang3.StringUtils.substringAfter(expectedVersion, "-hib");
+				println "NuoDB Hibernate JAR is for Hibernate " + majorVersion;
+
+				// They must match
+				if (!majorVersionFromDir.equals(majorVersion)) {
+					throw new RuntimeException("BUILD FAILED: 'DIALECT_VERSION' incorrect, tests are for Hibernate " //
+						+ majorVersionFromDir + " but JAR nuodb-hibernate-" + expectedVersion
+						+ " expects Hibernate " + majorVersion);
+				}
+			} else {
+				println("BUILD WARNING: Unable to determine Hibernate dialect from project's 'changelog.txt'." 
+					+ " Make sure that DIALECT_VERSION is correct." )
+			}
+		}
 
 		System.out.println("NuoDB Hibernate JAR version = " + nuodbHibernateJarVersion);
 		this.nuodbHibernateJarVersion = nuodbHibernateJarVersion;
