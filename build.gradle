@@ -4,9 +4,9 @@
  */
 
 buildscript {
-	// BEGIN: For NUODB - only needed if running matrix tests?
+	// BEGIN: For NUODB
 	// Set NuoDB JDBC JAR version
-	ext.nuodbJdbcJarVersion = "24.2.2";  // Any version will do
+	ext.nuodbJdbcJarVersion = "24.2.1";  // Any version will do
 	println("Using NuoDB JDBC JAR ${nuodbJdbcJarVersion}")
 
 	// Look for our JAR locally
@@ -410,7 +410,7 @@ public class CheckNuoDBDatabaseAndVersion {
 			String line;
 
 			while ((line = rdr.readLine()) != null)
-			lines.add(line);
+				lines.add(line);
 		} catch (java.io.IOException e) {
 			throw new RuntimeException("Failed to read " + localDatabasesFile + ": " + e.getLocalizedMessage() + " (" + e.getClass().getSimpleName() + ")");
 		}

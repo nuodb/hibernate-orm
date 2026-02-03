@@ -380,9 +380,10 @@ ext {
                     'jdbc.driver': 'com.nuodb.hibernate.NuoHibernateDriver',
                     'jdbc.user'  : 'hibernate_orm_test',
                     'jdbc.pass'  : 'hibernate_orm_test',
-                    'connection.init_sql' : '',
+                    // Ensure READ_COMMITTED is default isolation (like other RDBMSs) and reduce lock-wait time so failed tests fail more quickly
                     'jdbc.url'   : 'jdbc:com.nuodb.hib://' + dbHost + '/hibernate_orm_test?isolation=read_committed&lock-wait-timeout=10',
                     'jdbc.datasource' : 'com.nuodb.jdbc.Driver',
+                    'connection.init_sql' : '',
                     'hibernate.connection.isolation' : 'READ_COMMITTED'
             ],            
     ]
