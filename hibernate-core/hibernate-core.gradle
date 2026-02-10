@@ -127,6 +127,62 @@ test {
         // Tests to skip due to known NuoDB limitations
         // --------------------------------------------
 
+        println "hibernate-core.gradle: NuoDB JDBC JAR version is V${nuodbJdbcJarVersion}"
+
+        // Does the NuoDB JDBC JAR support NClob, NString ... ?
+        if (nuodbJdbcJarVersion.compareTo('24.2.2') >= 0) {
+            println 'hibernate-core.gradle: Excluding tests of Nationalized columns'
+            excludeTestsMatching 'NClobTest.test'
+            excludeTestsMatching 'org.hibernate.orm.test.type.LobUnfetchedPropertyTest.testNClob'
+        } else {
+            println 'hibernate-core.gradle: Including tests of Nationalized columns'
+        }
+
+        println "hibernate-core.gradle: NuoDB Database version is V${nuodbDatabaseVersion}" 
+
+        if (nuodbDatabaseVersion.isBefore(7,0,0)) {
+            println 'hibernate-core.gradle: Excluding tests using NuoDB 7 features'
+
+            // FULL OUTER JOIN not supported until NuoDB 7
+            excludeTestsMatching 'org.hibernate.orm.test.join.OuterJoinTest.testJoinOrderWithFullJoin'
+            excludeTestsMatching 'org.hibernate.orm.test.join.OuterJoinTest.testJoinOrderWithFullJoinWithIdDereference'
+            excludeTestsMatching 'org.hibernate.orm.test.join.OuterJoinTest.testJoinOrderWithFullNormalJoin'
+            excludeTestsMatching 'org.hibernate.orm.test.join.OuterJoinTest.testJoinOrderWithFullNormalJoinWithIdDereference'
+            excludeTestsMatching 'org.hibernate.orm.test.mapping.inheritance.joined.JoinedSubclassTest.testJoinedSubclass' // ?
+            excludeTestsMatching 'org.hibernate.orm.test.query.RightJoinNullnessPredicateQueryTest.testDereferenceIsNull'
+            excludeTestsMatching 'org.hibernate.orm.test.query.RightJoinNullnessPredicateQueryTest.testFullJoinIsNull'
+            excludeTestsMatching 'org.hibernate.orm.test.query.SelectForeignKeyWithMissingFromTest.testFullJoin'
+            excludeTestsMatching 'org.hibernate.orm.test.query.SelectForeignKeyWithMissingFromTest.testFullJoinEntityPath'
+
+            // Window functions: var_samp(), var_pop(), rank(). dense_rank(), stddev_samp(), stddev_pop()
+            excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testStatisticalFunctions'
+            excludeTestsMatching 'org.hibernate.orm.test.hql.HQLTest.test_var_function_example'
+
+            excludeTestsMatching 'org.hibernate.orm.test.query.criteria.CriteriaWindowFunctionTest.testRank'
+
+            excludeTestsMatching 'org.hibernate.orm.test.query.hql.WindowFunctionTest.testRank' // rank()
+            excludeTestsMatching 'org.hibernate.orm.test.query.hql.WindowFunctionTest.testOrderByAndAlias' // dense_rank()
+
+            excludeTestsMatching 'org.hibernate.orm.test.jpa.query.CorrelationCteDerivedRootTest.testDerivedRoot'
+		    excludeTestsMatching 'org.hibernate.orm.test.query.hql.InsertSelectTests.testInsertSelectDistinct'
+
+            // CASE ... IN (...) weirdness
+            excludeTestsMatching 'org.hibernate.orm.test.hql.HQLTest.test_hql_in_predicate_example_1'
+            excludeTestsMatching 'org.hibernate.orm.test.jpa.ql.TreatKeywordTest.testFilteringJoinedSubclasses'
+        } else {
+            println 'hibernate-core.gradle: Running tests using NuoDB 7 features'
+        }
+
+        // No support for first_value(), nth_value(), percent_rank(), cume_dist() or empty order()
+        excludeTestsMatching 'org.hibernate.orm.test.query.criteria.CriteriaTimeoutTest.testCreateMutationQueryCriteriaInsertSelect' // over()
+		excludeTestsMatching 'CriteriaWindowFunctionTest.testFrame'
+		excludeTestsMatching 'CriteriaWindowFunctionTest.testFirstValue'
+		excludeTestsMatching 'CriteriaWindowFunctionTest.testNthValue'
+		excludeTestsMatching 'CriteriaWindowFunctionTest.testReusableWindow'
+		excludeTestsMatching 'CriteriaWindowFunctionTest.testRowNumberWithoutOrder' // over()
+        excludeTestsMatching 'org.hibernate.orm.test.query.hql.WindowFunctionTest.testFrame'
+        excludeTestsMatching 'org.hibernate.orm.test.query.hql.WindowFunctionTest.testRowNumberWithoutOrder' // over()
+
         // Functions or behaviours NuoDB doesn't support
         excludeTestsMatching 'NamedQueryCommentTest' // our query hints go after select/update not before
 		excludeTestsMatching 'NullPrecedenceTest.testNullPrecedence'  // NuoDB does not support NULL precedence
@@ -270,6 +326,9 @@ test {
 
         // any(sub-select) not supported
         excludeTestsMatching 'org.hibernate.orm.test.query.hql.SubqueryOperatorsTest.testAny'
+
+        // FETCH ... WITH TIES not supported
+        excludeTestsMatching 'org.hibernate.orm.test.pagination.FetchClausePaginationTest.testFetchWithTies'
 
         // ???
         excludeTestsMatching 'org.hibernate.orm.test.query.hql.set.SetOperationTest.testAlternatingSetOperator' // No such element exception
