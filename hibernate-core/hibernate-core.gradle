@@ -238,7 +238,7 @@ test {
 		excludeTestsMatching 'CriteriaMultiselectGroupByAndOrderByTest.testSubqueryGroupByAndOrderBy'
 		excludeTestsMatching 'CriteriaMultiselectGroupByAndOrderByTest.testSubqueryGroupByAndOrderByAndHaving'
 
-        // sign() function in @Formaula annotation is used as-is - the registered emulation is ignored
+        // sign() function in @Formula annotation is used as-is - the registered emulation is ignored
         excludeTestsMatching 'FormulaWithPartitionByTest'
 
         // NuoDB does not take read locks
