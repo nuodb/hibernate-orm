@@ -130,7 +130,9 @@ test {
         println "hibernate-core.gradle: NuoDB JDBC JAR version is V${nuodbJdbcJarVersion}"
 
         // Does the NuoDB JDBC JAR support NClob, NString ... ?
-        if (nuodbJdbcJarVersion.compareTo('24.2.2') >= 0) {
+        SimpleDatabaseVersion jdbcJarVersion = new SimpleDatabaseVersion(nuodbJdbcJarVersion);
+
+        if (jdbcJarVersion.isBefore('24.2.2')) {  // Supported from 24.2.2
             println 'hibernate-core.gradle: Excluding tests of Nationalized columns'
             excludeTestsMatching 'NClobTest.test'
             excludeTestsMatching 'org.hibernate.orm.test.type.LobUnfetchedPropertyTest.testNClob'
