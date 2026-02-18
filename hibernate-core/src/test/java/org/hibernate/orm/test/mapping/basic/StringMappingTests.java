@@ -5,6 +5,7 @@
 package org.hibernate.orm.test.mapping.basic;
 
 import java.sql.Types;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Lob;
@@ -13,6 +14,7 @@ import jakarta.persistence.Table;
 import org.hibernate.metamodel.mapping.JdbcMapping;
 import org.hibernate.metamodel.mapping.internal.BasicAttributeMapping;
 import org.hibernate.metamodel.spi.MappingMetamodelImplementor;
+import org.hibernate.orm.test.mapping.basic.StringMappingTests.EntityOfStrings;
 import org.hibernate.persister.entity.EntityPersister;
 import org.hibernate.type.descriptor.jdbc.spi.JdbcTypeRegistry;
 
@@ -82,6 +84,7 @@ public class StringMappingTests {
 
 		//tag::basic-string-example[]
 		// will be mapped using VARCHAR
+		@Column(name="xstring") // NuoDB: 'string' is reserved word
 		String string;
 
 		// will be mapped using CLOB

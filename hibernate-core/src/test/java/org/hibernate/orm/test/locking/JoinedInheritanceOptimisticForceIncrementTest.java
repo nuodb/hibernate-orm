@@ -69,7 +69,7 @@ public class JoinedInheritanceOptimisticForceIncrementTest {
 		private Long id;
 
 		@Version
-		@Column(name = "ver")
+		@Column(name = "xver") // NuoDB: 'ver' is reserved word
 		private Integer version;
 
 		private String name;

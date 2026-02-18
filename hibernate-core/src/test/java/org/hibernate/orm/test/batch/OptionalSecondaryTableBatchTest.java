@@ -8,7 +8,7 @@ import java.util.List;
 
 import org.hibernate.annotations.SecondaryRow;
 import org.hibernate.cfg.AvailableSettings;
-
+import org.hibernate.orm.test.batch.OptionalSecondaryTableBatchTest.Company;
 import org.hibernate.testing.orm.junit.DomainModel;
 import org.hibernate.testing.orm.junit.ServiceRegistry;
 import org.hibernate.testing.orm.junit.SessionFactory;
@@ -100,7 +100,7 @@ public class OptionalSecondaryTableBatchTest {
 		private int id;
 
 		@Version
-		@Column( name = "ver" )
+		@Column( name = "xver") // NuoDB: ver reserved word
 		private int version;
 
 		private String name;

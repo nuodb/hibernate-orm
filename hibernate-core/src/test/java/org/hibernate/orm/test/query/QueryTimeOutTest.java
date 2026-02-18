@@ -69,7 +69,10 @@ public class QueryTimeOutTest extends BaseSessionFactoryFunctionalTest {
 						Types.VARCHAR
 				);
 		final String baseQuery;
-		if ( DialectContext.getDialect() instanceof OracleDialect ) {
+		// NUODB: Add our dialect
+		if ( DialectContext.getDialect() instanceof OracleDialect
+			|| DialectContext.getDialect().getClass().getName().contains("nuodb")) {
+		// NUODB: End
 			baseQuery = "update AnEntity ae1_0 set ae1_0.name=?";
 		}
 		else if ( DialectContext.getDialect() instanceof SybaseDialect ) {

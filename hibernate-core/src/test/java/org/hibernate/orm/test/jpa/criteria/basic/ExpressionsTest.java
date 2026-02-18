@@ -30,6 +30,7 @@ import org.hibernate.query.criteria.HibernateCriteriaBuilder;
 import org.hibernate.query.criteria.JpaCriteriaQuery;
 import org.hibernate.query.criteria.JpaDerivedRoot;
 import org.hibernate.query.criteria.JpaSubQuery;
+import org.hibernate.testing.orm.junit.DialectContext; // For NuoDB
 import org.hibernate.testing.orm.junit.EntityManagerFactoryScope;
 import org.hibernate.testing.orm.junit.Jira;
 import org.hibernate.testing.orm.junit.JiraKey;
@@ -349,14 +350,20 @@ public class ExpressionsTest {
 					entityManager.createQuery(criteria).getSingleResult();
 				}
 		);
-		scope.inTransaction( entityManager -> {
+		// NUODB: START - skip this test
+		// Duration uses seconds to do calculation but can't do TIME intervals between DATEs
+		// in NuoDB, only between TIMESTAMPs
+		if (!DialectContext.getDialect().getClass().getName().startsWith("com.nuodb")) {
+			scope.inTransaction( entityManager -> {
 					CriteriaQuery<Duration> criteria = builder.createQuery(Duration.class);
 					criteria.select( builder.durationBetween( builder.localDate(),
 							builder.subtractDuration( builder.localDate(),
 									builder.duration(2, TemporalUnit.DAY) ) ) );
 					assertEquals( Duration.ofDays(2), entityManager.createQuery(criteria).getSingleResult() );
 				}
-		);
+			);
+		}
+		// NUODB: END
 		scope.inTransaction( entityManager -> {
 					CriteriaQuery<Duration> criteria = builder.createQuery(Duration.class);
 					criteria.select( builder.durationBetween( builder.localDateTime(),

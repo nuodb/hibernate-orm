@@ -8,7 +8,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.hibernate.Hibernate;
 import org.hibernate.cfg.AvailableSettings;
-
+import org.hibernate.orm.test.bytecode.enhancement.lazy.LazyLoadingAndInheritanceTest.ContainedExtended;
 import org.hibernate.testing.bytecode.enhancement.extension.BytecodeEnhanced;
 import org.hibernate.testing.orm.junit.DomainModel;
 import org.hibernate.testing.orm.junit.JiraKey;
@@ -26,6 +26,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
 
 @DomainModel(
 		annotatedClasses = {
@@ -71,6 +72,7 @@ public class LazyLoadingAndInheritanceTest {
 	}
 
 	@Entity(name = "Containing")
+	@Table(name = "xcontaining") // NuoDB: containing reserved word
 	static class Containing {
 
 		@Id

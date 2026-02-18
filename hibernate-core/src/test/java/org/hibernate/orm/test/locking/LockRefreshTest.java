@@ -132,7 +132,7 @@ public class LockRefreshTest {
 		private String department;
 
 		@Version
-		@Column(name = "ver")
+		@Column(name = "xver") // NuoDB: 'ver' is reserved word
 		private int version;
 	}
 }

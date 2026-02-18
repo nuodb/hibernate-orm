@@ -1,0 +1,105 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * Copyright Red Hat Inc. and Hibernate Authors
+ */
+package org.hibernate.testing.junit4;
+
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import jakarta.transaction.SystemException;
+
+import org.hibernate.engine.transaction.internal.jta.JtaStatusHelper;
+
+import org.hibernate.testing.AfterClassOnce;
+import org.hibernate.testing.jdbc.leak.ConnectionLeakUtil;
+import org.hibernate.testing.jta.TestingJtaPlatformImpl;
+import org.junit.After;
+import org.junit.Rule;
+import org.junit.rules.TestRule;
+import org.junit.rules.Timeout;
+import org.junit.runner.RunWith;
+
+import org.jboss.logging.Logger;
+
+/**
+ * <b>NUODB OVERRIDE CLASS</b>
+ * <p>
+ * Copy of class from hibernate-testing. Reduced test timeout rule from
+ * 30 mins to 3 mins.
+ * <p> * The base unit test adapter.
+ *
+ * @author Steve Ebersole
+ *
+ * @deprecated Use JUnit 5/6
+ */
+@Deprecated
+@RunWith( CustomRunner.class )
+public abstract class BaseUnitTestCase {
+
+	protected final Logger log = Logger.getLogger( getClass() );
+
+	private static boolean enableConnectionLeakDetection = Boolean.TRUE.toString()
+			.equals( System.getenv( "HIBERNATE_CONNECTION_LEAK_DETECTION" ) );
+
+	private ConnectionLeakUtil connectionLeakUtil;
+
+	protected final ExecutorService executorService = Executors.newSingleThreadExecutor();
+
+	@Rule
+	// NUODB: No test should run longer than 3 minutes (was 30)
+	public TestRule globalTimeout = Timeout.millis(TimeUnit.MINUTES.toMillis(3));
+	// NUODB END
+
+	public BaseUnitTestCase() {
+		if ( enableConnectionLeakDetection ) {
+			connectionLeakUtil = new ConnectionLeakUtil();
+		}
+	}
+
+	@AfterClassOnce
+	public void assertNoLeaks() {
+		if ( enableConnectionLeakDetection ) {
+			connectionLeakUtil.assertNoLeaks();
+		}
+	}
+
+	@After
+	public void releaseTransactions() {
+		if ( JtaStatusHelper.isActive( TestingJtaPlatformImpl.INSTANCE.getTransactionManager() ) ) {
+			log.warn( "Cleaning up unfinished transaction" );
+			try {
+				TestingJtaPlatformImpl.INSTANCE.getTransactionManager().rollback();
+			}
+			catch (SystemException ignored) {
+			}
+		}
+	}
+
+	protected void sleep(long millis) {
+		try {
+			Thread.sleep( millis );
+		}
+		catch ( InterruptedException e ) {
+			Thread.interrupted();
+		}
+	}
+
+	protected Future<?> executeAsync(Runnable callable) {
+		return executorService.submit(callable);
+	}
+
+	protected void executeSync(Runnable callable) {
+		try {
+			executeAsync( callable ).get();
+		}
+		catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+		}
+		catch (ExecutionException e) {
+			throw new RuntimeException( e.getCause() );
+		}
+	}
+}

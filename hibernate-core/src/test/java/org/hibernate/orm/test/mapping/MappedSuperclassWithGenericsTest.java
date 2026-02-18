@@ -8,6 +8,7 @@ import java.io.Serializable;
 import java.util.List;
 import java.util.Objects;
 
+import org.hibernate.orm.test.mapping.MappedSuperclassWithGenericsTest.SimpleEntity;
 import org.hibernate.testing.orm.junit.DomainModel;
 import org.hibernate.testing.orm.junit.Jira;
 import org.hibernate.testing.orm.junit.SessionFactory;
@@ -144,7 +145,7 @@ public class MappedSuperclassWithGenericsTest {
 
 	@Entity( name = "SimpleEntity" )
 	public static class SimpleEntity extends GenericIdBaseEntity<Long> {
-		@Column
+		@Column(name = "xstring") // NuoDB: 'string' is reserved word
 		private String string;
 
 		public SimpleEntity() {

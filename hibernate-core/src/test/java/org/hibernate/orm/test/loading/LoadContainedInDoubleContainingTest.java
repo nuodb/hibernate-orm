@@ -4,12 +4,14 @@
  */
 package org.hibernate.orm.test.loading;
 
+import org.hibernate.orm.test.loading.LoadContainedInDoubleContainingTest.OtherContained;
 import org.hibernate.testing.orm.junit.DomainModel;
 import org.hibernate.testing.orm.junit.SessionFactory;
 import org.hibernate.testing.orm.junit.SessionFactoryScope;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToOne;
@@ -47,7 +49,7 @@ public class LoadContainedInDoubleContainingTest {
 		} );
 	}
 
-	@Entity(name = "Containing")
+	@Entity(name = "xContaining") // NuoDB: 'containing' is reserved word
 	public static class Containing {
 
 		@Id
@@ -112,6 +114,7 @@ public class LoadContainedInDoubleContainingTest {
 		private String text;
 
 		@OneToOne
+		@Column(name="xcontaining") // NuoDB: 'containing' is reserved word
 		private Containing containing;
 
 		public Contained() {
@@ -155,6 +158,7 @@ public class LoadContainedInDoubleContainingTest {
 		private String text;
 
 		@OneToOne
+		@Column(name="xcontaining") // NuoDB: 'containing' is reserved word
 		private Containing containing;
 
 		public OtherContained() {

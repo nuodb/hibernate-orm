@@ -26,6 +26,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertTrue; // For NuoDB
 import static org.hibernate.testing.orm.junit.DialectContext.getDialect;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -103,7 +104,11 @@ public class BatchOptimisticLockingTest {
 			var msg = "could not execute batch";
 			assertThat( exception.getMessage() ).contains( msg );
 		}
-		else {
+		// NUODB: START  Our message is not as details
+		else if (dialect.getClass().getPackage().getName().equals("com.nuodb.hibernate")) {
+			assertTrue(expected.getMessage().startsWith("Batch update returned unexpected row count from update"));
+		// NUODB: END
+		} else {
 			assertThat( exception ).isInstanceOf( OptimisticLockException.class );
 
 			if ( dialect instanceof MariaDBDialect && getDialect().getVersion().isAfter( 11, 6, 2 ) ) {

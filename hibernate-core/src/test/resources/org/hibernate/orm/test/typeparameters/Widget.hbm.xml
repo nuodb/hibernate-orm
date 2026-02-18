@@ -28,7 +28,7 @@
 				<param name="default">-5</param>
 			</type>
 		</property>
-		<property name="string"/>
+		<property name="xstring"/> // NuoDB: 'string' is reserved word`
     </class>
     
 

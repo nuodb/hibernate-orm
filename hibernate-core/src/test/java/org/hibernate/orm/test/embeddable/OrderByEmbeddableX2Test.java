@@ -86,7 +86,7 @@ public class OrderByEmbeddableX2Test {
 		session.persist( containing );
 	}
 
-	@Entity(name = "containing")
+	@Entity(name = "xcontaining") // NuoDB: 'containing' is reserved word
 	public static class Containing {
 
 		@Id

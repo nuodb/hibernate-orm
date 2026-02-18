@@ -12,6 +12,7 @@ import jakarta.persistence.Version;
 import org.hibernate.annotations.Generated;
 import org.hibernate.dialect.SybaseASEDialect;
 import org.hibernate.generator.EventType;
+import org.hibernate.orm.test.version.sybase.SybaseTimestampComparisonAnnotationsTest.Thing;
 import org.hibernate.testing.orm.junit.DomainModel;
 import org.hibernate.testing.orm.junit.JiraKey;
 import org.hibernate.testing.orm.junit.RequiresDialect;
@@ -80,7 +81,7 @@ public class SybaseTimestampComparisonAnnotationsTest {
 
 		@Version
 		@Generated(event = { EventType.INSERT,EventType.UPDATE})
-		@Column(name = "ver", columnDefinition = "timestamp")
+		@Column(name = "xver", columnDefinition = "timestamp") // NuoDB: 'ver' is reserved word
 		private byte[] version;
 
 		private String name;

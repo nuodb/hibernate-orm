@@ -1,4 +1,7 @@
-== Hibernate ORM
+== Hibernate ORM 7.2
+
+NOTE: This is a fork of the `hibernate-orm` project and we use it to test NuoDB's Hibernate Dialects.
+For more information see xref:README-NUODB.adoc[].
 
 image:https://img.shields.io/maven-central/v/org.hibernate.orm/hibernate-core.svg?label=Maven%20Central&style=for-the-badge[Maven Central,link=https://central.sonatype.com/search?namespace=org.hibernate.orm&sort=name]
 image:https://img.shields.io/jenkins/build?jobUrl=https%3A%2F%2Fci.hibernate.org%2Fjob%2Fhibernate-orm-pipeline%2Fjob%2Fmain%2F&style=for-the-badge[Build Status,link=https://ci.hibernate.org/job/hibernate-orm-pipeline/job/main/]

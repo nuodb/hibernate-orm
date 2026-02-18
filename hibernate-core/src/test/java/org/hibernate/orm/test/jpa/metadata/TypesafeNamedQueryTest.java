@@ -17,6 +17,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 public class TypesafeNamedQueryTest {
 	@Test void test(EntityManagerFactoryScope scope) {
 		scope.inTransaction( entityManager -> {
+
+			// NUODB: Start
+			// Add a short delay so the time stamps are actually different. Otherwise sorting by
+			// time stamp (Record.AllRecordsAsTuples query) is arbitrary.
+			try { Thread.sleep(1); } catch (InterruptedException e) {}
+			// NUODB: End
+
 			Record record1 = new Record("Hello, World!", LocalDate.EPOCH.atStartOfDay());
 			Record record2 = new Record("Goodbye!", LocalDate.EPOCH.atStartOfDay().plusSeconds( 1L ));
 			entityManager.persist(record1);

@@ -4,6 +4,7 @@
  */
 package org.hibernate.orm.test.fetch;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToOne;
@@ -88,7 +89,7 @@ public class OneToOneOwnerByContainedEagerCyclesTest {
 		} );
 	}
 
-	@Entity(name = "Containing")
+	@Entity(name = "xContaining") // NuoDB: 'containing' is reserved word
 	public static class Containing {
 
 		@Id
@@ -142,6 +143,7 @@ public class OneToOneOwnerByContainedEagerCyclesTest {
 		private Integer id;
 
 		@OneToOne
+		@Column(name = "xcontaining") // NuoDB: 'containing' is reserved word
 		private Containing containing;
 
 		private String text;
