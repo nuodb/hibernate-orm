@@ -44,14 +44,13 @@ plugins {
 	id "com.dorongold.task-tree" version "4.0.1"
 }
 
+repositories {
+	mavenCentral()
+	mavenLocal()
+}
+
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // BEGIN: For NUODB
-
-// Suppress excessive warnings
-//tasks.withType(JavaCompile) {
-    //options.warnings = false
-	//options.compilerArgs += ["-nowarn", "-XDenableSunApiLintControl"]
-//}
 
 // Tests take about 10 mins to compile and will then fail if the database is
 // unavailable or the dialect is wrong.  We do our own checks here to catch
@@ -68,7 +67,7 @@ if (!file(groovySrcDir).exists())
 
 var checker = //
 	new CheckNuoDBDatabaseAndVersion(com.nuodb.jdbc.DataSource.class) //
-	.validate(nuodbJdbcJarVersion, project, databasesGradleFile);
+		.validate(nuodbJdbcJarVersion, project, databasesGradleFile);
 
 // Save these away
 ext.nuodbHibernateJarVersion = checker.nuodbHibernateJarVersion;

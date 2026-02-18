@@ -52,7 +52,7 @@ public class AntlrHelper {
 			File generatedJavaFile,
 			File outputDirectory,
 			Project project) {
-		project.getLogger().lifecycle( "Stripping silly generated-from line from {} into {}",
+		project.getLogger().debug( "Stripping silly generated-from line from {} into {}",
 				generatedJavaFile.getAbsolutePath(),
 				outputDirectory.getAbsolutePath() );
 

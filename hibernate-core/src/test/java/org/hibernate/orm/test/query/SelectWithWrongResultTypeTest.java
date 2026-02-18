@@ -5,6 +5,7 @@
 package org.hibernate.orm.test.query;
 
 import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -146,6 +147,7 @@ public class SelectWithWrongResultTypeTest {
 		@Version
 		Integer version;
 
+		@Column(name="xstring") // NUODB: String is a reserved word
 		String string;
 
 		@ManyToOne(fetch = FetchType.LAZY,

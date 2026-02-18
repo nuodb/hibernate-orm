@@ -104,9 +104,9 @@ public class BatchOptimisticLockingTest {
 			var msg = "could not execute batch";
 			assertThat( exception.getMessage() ).contains( msg );
 		}
-		// NUODB: START  Our message is not as details
+		// NUODB: START  Our message is not as detailed
 		else if (dialect.getClass().getPackage().getName().equals("com.nuodb.hibernate")) {
-			assertTrue(expected.getMessage().startsWith("Batch update returned unexpected row count from update"));
+			assertThat(exception.getMessage()).startsWith("Batch update returned unexpected row count from update");
 		// NUODB: END
 		} else {
 			assertThat( exception ).isInstanceOf( OptimisticLockException.class );

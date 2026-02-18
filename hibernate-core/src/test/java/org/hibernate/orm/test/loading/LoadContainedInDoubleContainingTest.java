@@ -15,6 +15,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToOne;
+import jakarta.persistence.PrimaryKeyJoinColumn;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -114,7 +115,7 @@ public class LoadContainedInDoubleContainingTest {
 		private String text;
 
 		@OneToOne
-		@Column(name="xcontaining") // NuoDB: 'containing' is reserved word
+		@PrimaryKeyJoinColumn(name="xcontaining") // NuoDB: 'containing' is reserved word
 		private Containing containing;
 
 		public Contained() {

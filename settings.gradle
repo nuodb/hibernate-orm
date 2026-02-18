@@ -260,7 +260,7 @@ dependencyResolutionManagement {
             library( "db2", "com.ibm.db2", "jcc" ).versionRef( db2Version )
             library( "hana", "com.sap.cloud.db.jdbc", "ngdbc" ).versionRef( hanaVersion )
             library( "sybase", "net.sourceforge.jtds", "jtds" ).versionRef( sybaseVersion )
-            library("teradata", "com.teradata.jdbc", "terajdbc").versionRef(teradataVersion)
+            library( "teradata", "com.teradata.jdbc", "terajdbc").versionRef(teradataVersion)
             library( "informix", "com.ibm.informix", "jdbc" ).versionRef( informixVersion )
             library( "firebird", "org.firebirdsql.jdbc", "jaybird" ).versionRef( firebirdVersion )
             library( "altibase", "com.altibase", "altibase-jdbc" ).versionRef( altibaseVersion )

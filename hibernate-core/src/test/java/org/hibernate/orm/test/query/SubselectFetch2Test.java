@@ -4,6 +4,7 @@
  */
 package org.hibernate.orm.test.query;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -15,6 +16,8 @@ import jakarta.persistence.Transient;
 import jakarta.persistence.Version;
 import org.hibernate.annotations.Fetch;
 import org.hibernate.annotations.FetchMode;
+import org.hibernate.orm.test.query.SubselectFetch2Test.NodeHolder;
+import org.hibernate.orm.test.query.SubselectFetch2Test.NodeIntermediateHolder;
 import org.hibernate.testing.orm.junit.DomainModel;
 import org.hibernate.testing.orm.junit.JiraKey;
 import org.hibernate.testing.orm.junit.SessionFactory;
@@ -164,6 +167,7 @@ public class SubselectFetch2Test {
 		Integer id;
 		@Version
 		Integer version;
+		@Column(name="xstring") // NUODB: String is a reserved word
 		String string;
 		@Transient
 		boolean loaded = false;

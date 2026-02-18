@@ -15,13 +15,6 @@ repositories {
 	mavenCentral()
     mavenLocal()
 }
-
-// Not sure why, but this test has stopped working. Runs fine if executed manually its own.
-// test {
-//     filter {
-//         excludeTestsMatching 'org.hibernate.testing.annotations.methods.SessionFactoryTesting'
-//     }
-// }
 // END: For NUODB
 
 dependencies {
