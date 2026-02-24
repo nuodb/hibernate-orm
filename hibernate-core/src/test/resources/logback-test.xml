@@ -1,0 +1,69 @@
+<!--
+  // SLF4J is included by the POM, and redirects Log4J (Hibernate) and Java Util
+  // logging (NuoDB) to Logback.
+  // This file configures Logback output (and avoids distracting warnings).
+  -->
+<configuration debug="false">
+
+    <!-- Based on example in https://stackify.com/logging-logback/ -->
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+            <pattern>%-5level{5} %-44logger{44} %msg %n</pattern>
+            <pattern>%magenta(%d{HH:mm:ss.SSS}) %red(%-5level{5}) %green(%-32logger{32}) %blue(%msg) %n</pattern>
+        </encoder>
+    </appender>
+
+    <root>
+        <appender-ref ref="STDOUT" />
+    </root>
+
+    <logger name="ch.qos.logback" level="warn" />
+    <logger name="org" level="warn" />
+    <logger name="com" level="warn" />
+	<!-- <logger name="com.nuodb.hibernate" level="warn" /> -->
+
+	<logger name="com.zaxxer" level="warn" />
+	
+	<!-- Suppress stack trace when Hibernate tests createNClob(), which NuoDB does not implement. -->
+	<logger name="com.zaxxer.hikari.pool.ProxyConnection" level="error" />
+	
+	<!-- Suppress warning that this is for testing only. -->
+	<logger name="org.hibernate.testing.cache.CachingRegionFactory" level="error" />
+
+	<!-- Tests and test framework-->
+	<logger name="org.springframework" level="info"/>
+	<logger name="com.nuodb.common" level="info"/>
+	<logger name="com.nuodb.hibernate.testing" level="info"/>
+
+
+    <logger name="com.nuodb.hibernate" level="info" />
+    <logger name="com.nuodb.hibernate.NuoDBDialect" level="info" />
+    <logger name="com.nuodb.hibernate.NuoDBSqlAstTranslator" level="info" />
+	<logger name="com.nuodb.hibernate.orm.connections.pooling" level="info"/>
+
+	<logger name="org.hibernate" level="info"/>
+
+    <!-- Set to trace to show query parameters -->
+    <logger name="org.hibernate.orm.test.jpa" level="warn"/>
+    
+	<!-- Set to debug to log the HQL -->
+    <logger name="org.hibernate.orm.query.hql" level="debug"/>
+    
+    <!-- Set to debug to log the SQL statements -->
+    <logger name="org.hibernate.SQL" level="warn" />
+
+    <!-- Set to trace to log the JDBC parameters passed to a query -->
+    <logger name="org.hibernate.type.descriptor.sql" level="warn" />
+    <logger name="org.hibernate.orm.jdbc.bind" level="warn" />
+    
+	<!-- Suppress engine logging-->
+    <logger name="org.hibernate.engine" level="warn" />
+    
+    <!-- Suppress duplicate logging from this class -->
+    <logger name="org.hibernate.engine.jdbc.spiSqlExceptionHelper" level="error" />
+    
+    <logger name="org.hibernate.testing.support" level="info" />
+    <logger name="org.hibernate" level="warn" />
+    <logger name="org.hibernate.orm.results.graph.AST" level="debug" />
+
+</configuration>

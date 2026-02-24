@@ -392,7 +392,7 @@ ext {
                     // Overriding default transaction definition (5 seconds instead of infinite wait) to prevent problems in test cleanup
                     // Expects alias 'hibernate_orm_test' in aliases.conf (FB2.5 and earlier) or databases.conf (FB3.0 and later)
                     // Created database must either use default character set NONE, or UTF8 with page size 16384 or higher (to prevent issues with indexes due to keysize)
-                    'jdbc.url'   : 'jdbc:firebirdsql://' + dbHost +'/hibernate_orm_test?charSet=utf-8;TRANSACTION_READ_COMMITTED=read_committed,rec_version,wait,lock_timeout=5',
+                    'jdbc.url'   : 'jdbc:firebirdsql://' + dbHost + '/hibernate_orm_test?charSet=utf-8;TRANSACTION_READ_COMMITTED=read_committed,rec_version,wait,lock_timeout=5',
                     'jdbc.datasource' : 'org.firebirdsql.jdbc.FBDriver',
 //                        'jdbc.datasource' : 'org.firebirdsql.jdbc.FBDataSource',
                     'connection.init_sql' : ''
@@ -417,5 +417,6 @@ ext {
                     'jdbc.datasource' : 'com.nuodb.jdbc.Driver',
                     'connection.init_sql' : '',
                     'hibernate.connection.isolation' : 'READ_COMMITTED'
-            ],       ]
+            ],
+        ]   
 }

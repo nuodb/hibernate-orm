@@ -4,11 +4,16 @@
  */
 package org.hibernate.orm.test.batch;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.OptimisticLockException;
-import jakarta.persistence.RollbackException;
-import jakarta.persistence.Version;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hibernate.testing.orm.junit.DialectContext.getDialect;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.fail;
+
+import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 import org.hibernate.cfg.AvailableSettings;
 import org.hibernate.dialect.CockroachDialect;
 import org.hibernate.dialect.Dialect;
@@ -20,16 +25,11 @@ import org.hibernate.testing.orm.junit.SessionFactoryScope;
 import org.hibernate.testing.orm.junit.Setting;
 import org.junit.jupiter.api.Test;
 
-import java.util.List;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertTrue; // For NuoDB
-import static org.hibernate.testing.orm.junit.DialectContext.getDialect;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.fail;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.OptimisticLockException;
+import jakarta.persistence.RollbackException;
+import jakarta.persistence.Version;
 
 /**
  * @author Vlad Mihalcea
@@ -106,7 +106,7 @@ public class BatchOptimisticLockingTest {
 		}
 		// NUODB: START  Our message is not as details
 		else if (dialect.getClass().getPackage().getName().equals("com.nuodb.hibernate")) {
-			assertTrue(expected.getMessage().startsWith("Batch update returned unexpected row count from update"));
+			assertThat(exception.getMessage()).startsWith("Batch update returned unexpected row count from update");
 		// NUODB: END
 		} else {
 			assertThat( exception ).isInstanceOf( OptimisticLockException.class );
