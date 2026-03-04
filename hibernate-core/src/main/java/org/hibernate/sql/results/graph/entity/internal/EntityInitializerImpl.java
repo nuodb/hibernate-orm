@@ -906,31 +906,60 @@ public class EntityInitializerImpl extends AbstractInitializer<EntityInitializer
 			setMissing( data );
 			return;
 		}
-		data.setInstance( instance );
 		final LazyInitializer lazyInitializer = extractLazyInitializer( instance );
 		final RowProcessingState rowProcessingState = data.getRowProcessingState();
 		final SharedSessionContractImplementor session = rowProcessingState.getSession();
 		final PersistenceContext persistenceContext = session.getPersistenceContextInternal();
 		if ( lazyInitializer == null ) {
 			// Entity is most probably initialized
-			data.entityInstanceForNotify = instance;
 			data.concreteDescriptor = session.getEntityPersister( null, instance );
 			resolveEntityKey(
 					data,
 					data.concreteDescriptor.getIdentifier( instance, session )
 			);
-			data.entityHolder = persistenceContext.getEntityHolder( data.entityKey );
-			if ( data.entityHolder == null ) {
-				// Entity was most probably removed in the same session without setting this association to null.
-				// Since this load request can happen through `find()` which doesn't auto-flush on association joins,
-				// the entity must be fully initialized, even if it is removed already
-				data.entityHolder = persistenceContext.claimEntityHolderIfPossible(
-						data.entityKey,
-						data.entityInstanceForNotify,
-						rowProcessingState.getJdbcValuesSourceProcessingState(),
-						this
-				);
+			data.entityHolder = persistenceContext.claimEntityHolderIfPossible(
+					data.entityKey,
+					null,
+					rowProcessingState.getJdbcValuesSourceProcessingState(),
+					this
+			);
+			if ( data.entityHolder.getManagedObject() == null ) {
+				final EntityEntry entry = persistenceContext.getEntry( instance ); // make sure an EntityEntry exists
+				if ( entry == null ) {
+					// We cannot reuse an entity instance that has no entry in the PC,
+					// this can happen if the parent entity contained a detached instance.
+					// We need to create a new instance in this case (see resolveEntityInstance1)
+					instance = resolveEntityInstance( data );
+				}
+				else {
+					// Entity was most probably removed in the same session without setting this association to null.
+					// Since this load request can happen through `find()` which doesn't auto-flush on association joins,
+					// the entity must be fully initialized, even if it is removed already
+					data.entityHolder = persistenceContext.claimEntityHolderIfPossible(
+							data.entityKey,
+							instance,
+							rowProcessingState.getJdbcValuesSourceProcessingState(),
+							this
+					);
+				}
 			}
+			else if ( data.entityHolder.getEntity() == null ) {
+				assert data.entityHolder.getProxy() != instance;
+				instance = resolveEntityInstance( data );
+				data.entityKey = data.entityHolder.getEntityKey();
+				if ( data.entityHolder.getProxy() != null ) {
+					castNonNull( extractLazyInitializer( data.entityHolder.getProxy() ) ).setImplementation( instance );
+				}
+			}
+			else if ( data.entityHolder.getEntity() != instance ) {
+				// The instance contained in the parent entity is different from the managed persistent instance
+				// currently in the persistence context. We should always initialize the managed one in this case.
+				instance = data.entityHolder.getEntity();
+				data.entityKey = data.entityHolder.getEntityKey();
+			}
+
+			data.entityInstanceForNotify = instance;
+
 			if ( data.concreteDescriptor.getBytecodeEnhancementMetadata().isEnhancedForLazyLoading()
 					&& isPersistentAttributeInterceptable( data.entityInstanceForNotify )
 					&& getAttributeInterceptor( data.entityInstanceForNotify ) instanceof EnhancementAsProxyLazinessInterceptor
@@ -959,27 +988,58 @@ public class EntityInitializerImpl extends AbstractInitializer<EntityInitializer
 					? entityDescriptor
 					: determineConcreteEntityDescriptor( rowProcessingState, discriminatorAssembler, entityDescriptor );
 			assert data.concreteDescriptor != null;
-			resolveEntityKey( data, lazyInitializer.getIdentifier() );
+			resolveEntityKey( data, lazyInitializer.getInternalIdentifier() );
 			data.entityHolder = persistenceContext.claimEntityHolderIfPossible(
 					data.entityKey,
 					null,
 					rowProcessingState.getJdbcValuesSourceProcessingState(),
 					this
 			);
+
 			// Resolve and potentially create the entity instance
-			data.entityInstanceForNotify = resolveEntityInstance( data );
-			lazyInitializer.setImplementation( data.entityInstanceForNotify );
-			registerLoadingEntity( data, data.entityInstanceForNotify );
+			if ( data.entityHolder.getProxy() == instance ) {
+				data.entityInstanceForNotify = resolveEntityInstance( data );
+				lazyInitializer.setImplementation( data.entityInstanceForNotify );
+			}
+			else if ( data.entityHolder.getEntity() == null ) {
+				data.entityInstanceForNotify = resolveEntityInstance( data );
+				if ( data.entityHolder.getProxy() != null ) {
+					castNonNull( extractLazyInitializer( data.entityHolder.getProxy() ) ).setImplementation( data.entityInstanceForNotify );
+				}
+			}
+			else {
+				data.entityInstanceForNotify = data.entityHolder.getEntity();
+				data.setState( data.entityHolder.isInitialized() ? State.INITIALIZED : State.RESOLVED );
+			}
 		}
 		else {
-			data.entityInstanceForNotify = lazyInitializer.getImplementation();
-			data.concreteDescriptor = session.getEntityPersister( null, data.entityInstanceForNotify );
-			resolveEntityKey( data, lazyInitializer.getIdentifier() );
+			final var implementation = lazyInitializer.getImplementation();
+			data.concreteDescriptor = session.getEntityPersister( null, implementation );
+			resolveEntityKey( data, lazyInitializer.getInternalIdentifier() );
 			data.entityHolder = persistenceContext.getEntityHolder( data.entityKey );
-			// Even though the lazyInitializer reports it is initialized, check if the entity holder reports initialized,
-			// because in a nested initialization scenario, this nested initializer must initialize the entity
-			data.setState( data.entityHolder.isInitialized() ? State.INITIALIZED : State.RESOLVED );
+			if ( data.entityHolder.getProxy() == instance ) {
+				data.entityInstanceForNotify = implementation;
+				// Even though the lazyInitializer reports it is initialized, check if the entity holder reports initialized,
+				// because in a nested initialization scenario, this nested initializer must initialize the entity
+				data.setState( data.entityHolder.isInitialized() ? State.INITIALIZED : State.RESOLVED );
+			}
+			else if ( data.entityHolder.getEntity() == null ) {
+				data.entityInstanceForNotify = resolveEntityInstance( data );
+				data.entityKey = data.entityHolder.getEntityKey();
+				if ( data.entityHolder.getProxy() != null ) {
+					castNonNull( extractLazyInitializer( data.entityHolder.getProxy() ) ).setImplementation( data.entityInstanceForNotify );
+				}
+				data.setState( State.RESOLVED );
+			}
+			else {
+				data.entityInstanceForNotify = data.entityHolder.getEntity();
+				data.entityKey = data.entityHolder.getEntityKey();
+				data.setState( data.entityHolder.isInitialized() ? State.INITIALIZED : State.RESOLVED );
+			}
 		}
+
+		data.setInstance( data.entityHolder.getManagedObject() );
+
 		if ( identifierAssembler != null ) {
 			final Initializer<?> initializer = identifierAssembler.getInitializer();
 			if ( initializer != null ) {
@@ -1102,6 +1162,10 @@ public class EntityInitializerImpl extends AbstractInitializer<EntityInitializer
 				else if ( data.entityHolder.getEntityInitializer() != this ) {
 					data.setState( State.INITIALIZED );
 				}
+				else if ( data.shallowCached ) {
+					// For shallow cached entities, only the id is available, so ensure we load the data immediately
+					data.setInstance( data.entityInstanceForNotify = resolveEntityInstance( data ) );
+				}
 			}
 			else if ( ( entityFromExecutionContext = getEntityFromExecutionContext( data ) ) != null ) {
 				// This is the entity to refresh, so don't set the state to initialized
@@ -1214,7 +1278,7 @@ public class EntityInitializerImpl extends AbstractInitializer<EntityInitializer
 			return resolved;
 		}
 		else {
-			if ( rowProcessingState.isQueryCacheHit() && entityDescriptor.useShallowQueryCacheLayout() ) {
+			if ( data.shallowCached ) {
 				// We must load the entity this way, because the query cache entry contains only the primary key
 				data.setState( State.INITIALIZED );
 				final SharedSessionContractImplementor session = rowProcessingState.getSession();
@@ -1634,6 +1698,10 @@ public class EntityInitializerImpl extends AbstractInitializer<EntityInitializer
 						castNonNull( discriminatorAssembler ),
 						entityDescriptor
 				);
+				if ( data.concreteDescriptor == null ) {
+					// this should imply the entity is missing
+					return;
+				}
 			}
 		}
 		resolveEntityState( data );
@@ -1788,6 +1856,11 @@ public class EntityInitializerImpl extends AbstractInitializer<EntityInitializer
 	@Override
 	public String toString() {
 		return "EntityJoinedFetchInitializer(" + LoggingHelper.toLoggableString( getNavigablePath() ) + ")";
+	}
+
+	@Override
+	public Object getResolvedInstanceNoProxy(EntityInitializerData data) {
+		return data.entityInstanceForNotify;
 	}
 
 	//#########################

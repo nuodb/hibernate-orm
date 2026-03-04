@@ -128,13 +128,18 @@ public class ArrayJdbcType implements JdbcType {
 				.getSizeStrategy()
 				.resolveSize( elementJdbcType, elementJavaType, null, null, null );
 		final DdlTypeRegistry ddlTypeRegistry = session.getTypeConfiguration().getDdlTypeRegistry();
-		final String typeName = ddlTypeRegistry.getDescriptor( elementJdbcType.getDdlTypeCode() )
-				.getTypeName( size, new BasicTypeImpl<>( elementJavaType, elementJdbcType), ddlTypeRegistry );
-		int cutIndex = typeName.indexOf( '(' );
-		if ( cutIndex > 0 ) {
+		final String typeName =
+				ddlTypeRegistry.getDescriptor( elementJdbcType.getDdlTypeCode() )
+						.getTypeName( size, new BasicTypeImpl<>( elementJavaType, elementJdbcType), ddlTypeRegistry );
+
+		final int cutIndexBegin = typeName.indexOf( '(' );
+		if ( cutIndexBegin > 0 ) {
+			final int cutIndexEnd = typeName.lastIndexOf( ')' );
+			assert cutIndexEnd > cutIndexBegin;
 			// getTypeName for this case required length, etc, parameters.
 			// Cut them out and use database defaults.
-			return typeName.substring( 0, cutIndex );
+			// e.g. "timestamp($p) with timezone" becomes "timestamp with timezone"
+			return typeName.substring( 0, cutIndexBegin ) + typeName.substring( cutIndexEnd + 1 );
 		}
 		else {
 			return typeName;
@@ -185,19 +190,28 @@ public class ArrayJdbcType implements JdbcType {
 	}
 
 	protected <X> X getArray(BasicExtractor<X> extractor, java.sql.Array array, WrapperOptions options) throws SQLException {
-		if ( array != null && getElementJdbcType() instanceof AggregateJdbcType ) {
-			final AggregateJdbcType aggregateJdbcType = (AggregateJdbcType) getElementJdbcType();
+		final JdbcType jdbcType = getElementJdbcType();
+		if (array != null
+				&& jdbcType instanceof AggregateJdbcType
+				&& ((AggregateJdbcType) jdbcType).getEmbeddableMappingType() != null) {
+			final AggregateJdbcType aggregateJdbcType = (AggregateJdbcType) jdbcType;
 			final EmbeddableMappingType embeddableMappingType = aggregateJdbcType.getEmbeddableMappingType();
 			final Object rawArray = array.getArray();
 			final Object[] domainObjects = new Object[Array.getLength( rawArray )];
 			for ( int i = 0; i < domainObjects.length; i++ ) {
-				final Object[] aggregateRawValues = aggregateJdbcType.extractJdbcValues( Array.get( rawArray, i ), options );
-				final StructAttributeValues attributeValues = StructHelper.getAttributeValues(
-						embeddableMappingType,
-						aggregateRawValues,
-						options
-				);
-				domainObjects[i] = instantiate( embeddableMappingType, attributeValues, options.getSessionFactory() );
+				final Object rawJdbcValue = Array.get(rawArray, i);
+				if (rawJdbcValue == null) {
+					domainObjects[i] = null;
+				}
+				else {
+					final Object[] aggregateRawValues = aggregateJdbcType.extractJdbcValues(rawJdbcValue, options);
+					final StructAttributeValues attributeValues = StructHelper.getAttributeValues(
+							embeddableMappingType,
+							aggregateRawValues,
+							options
+					);
+					domainObjects[i] = instantiate( embeddableMappingType, attributeValues, options.getSessionFactory() );
+				}
 			}
 			return extractor.getJavaType().wrap( domainObjects, options );
 		}

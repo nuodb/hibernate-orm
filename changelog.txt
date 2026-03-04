@@ -1,7 +1,383 @@
 Hibernate 6 Changelog
 =======================
 
+Changes in 6.6.44.Final (March 01, 2026)
+------------------------------------------------------------------------------------------------------------------------
+
+https://hibernate.atlassian.net/projects/HHH/versions/37977
+
+
+** Bug
+    * HHH-20176 Native Query cache causing ArrayIndexOutOfBoundsException with extra columns
+
+Changes in 6.6.43.Final (February 22, 2026)
+------------------------------------------------------------------------------------------------------------------------
+
+https://hibernate.atlassian.net/projects/HHH/versions/37572
+
+
+** Bug
+    * HHH-20168 Hibernate JsonWithArrayEmbeddableTest.testUpdateMultipleAggregateMembers test fail with Oracle 19c
+    * HHH-20161 Hibernate ArrayToStringWithArrayAggregateTest test fail with Oracle 19c
+
+Changes in 6.6.42.Final (February 01, 2026)
+------------------------------------------------------------------------------------------------------------------------
+
+https://hibernate.atlassian.net/projects/HHH/versions/37272
+
+
+** Bug
+    * HHH-20118 Vector operator SQL templates miss parenthesis around
+    * HHH-20069 `DB2iDialect.rowId` causes an error in merge queries
+
+Changes in 6.6.41.Final (January 18, 2026)
+------------------------------------------------------------------------------------------------------------------------
+
+https://hibernate.atlassian.net/projects/HHH/versions/37040
+
+
+** Bug
+    * HHH-20041 DB2 for z IN tuple list predicate performs badly
+    * HHH-20040 DB2iSqlAstTranslator using future versions for feature activation
+    * HHH-19929 DB2iDialect problem with supportsRowValueConstructorSyntaxInInSubQuery
+
+Changes in 6.6.40.Final (December 21, 2025)
+------------------------------------------------------------------------------------------------------------------------
+
+https://hibernate.atlassian.net/projects/HHH/versions/36905
+
+
+** Bug
+    * HHH-20008 Bad performance of MEMBER OF translation
+
+** Task
+    * HHH-19548 Upgrade to ByteBuddy 1.17.5
+
+Changes in 6.6.39.Final (December 14, 2025)
+------------------------------------------------------------------------------------------------------------------------
+
+https://hibernate.atlassian.net/projects/HHH/versions/36641
+
+
+** Bug
+    * HHH-19963 Wrong references in entity fields with circular associations
+    * HHH-19746 JPA parameters might be incorrectly handled resulting in exceptions or queries returning incorrect results
+
+** Improvement
+    * HHH-19943 Comparison of generic nested EmbeddedId's fails for JPQL and Criteria API
+
+Changes in 6.6.38.Final (November 30, 2025)
+------------------------------------------------------------------------------------------------------------------------
+
+https://hibernate.atlassian.net/projects/HHH/versions/36410
+
+
+** Bug
+    * HHH-19905 Implicit join re-use with nested inner and left joins causes ParsingException
+    * HHH-19883 JOIN TREAT ignores predicates
+    * HHH-18871 Nested NativeQuery mappings causing 'Could not locate TableGroup' exception after migration
+
+Changes in 6.6.37.Final (November 24, 2025)
+------------------------------------------------------------------------------------------------------------------------
+
+https://hibernate.atlassian.net/projects/HHH/versions/36080
+
+
+** Bug
+    * HHH-19936 Parameter casts for by-id lookups don't take column definition into account
+    * HHH-19926 NullPointerException when executing JPQL IN clause with null parameter on entity association
+    * HHH-19922 org.hibernate.orm:hibernate-platform:pom:7.1.7.Final is missing
+    * HHH-19910 EntityInitializer#resolveInstance wrongly initializes existing detached instance
+    * HHH-19038 Hibernate.get does not work on detached entities
+    * HHH-16991 EnhancedUserType cannot be used when defining relations
+
+Changes in 6.6.36.Final (November 16, 2025)
+------------------------------------------------------------------------------------------------------------------------
+
+https://hibernate.atlassian.net/projects/HHH/versions/36046
+
+
+** Bug
+    * HHH-19918 Avoid reflection when instantiating known FormatMapper
+    * HHH-19758 HQL parse failure with SLL can lead to wrong parse
+    * HHH-19240 Significant increase in heap allocation for queries after migrating Hibernate ORM 6.5 to 6.6
+
+Changes in 6.6.35.Final (November 13, 2025)
+------------------------------------------------------------------------------------------------------------------------
+
+https://hibernate.atlassian.net/projects/HHH/versions/35782
+
+
+** Bug
+    * HHH-19895 hibernate-core 6.6.30.Final breaks compatibility on entities with composite keys for multiple variants of DB2
+    * HHH-19888 FetchPlusOffsetParameterBinder fails to apply static offset for root pagination
+    * HHH-19887 Wrong ClassLoader used for Jackson Module discovery
+    * HHH-19739 Exceptions during load of entity with different persistent fields with same name
+
 Note: Please refer to JIRA to learn more about each issue.
+
+Changes in 6.6.34.Final (October 27, 2025)
+------------------------------------------------------------------------------------------------------------------------
+
+https://hibernate.atlassian.net/projects/HHH/versions/35683
+
+** Task
+    * [HHH-19889] - Mention third-party dialects throughout the documentation
+    * [HHH-19869] - Regroup all dialect information under a single guide
+
+
+Changes in 6.6.33.Final (October 10, 2025)
+------------------------------------------------------------------------------------------------------------------------
+
+https://hibernate.atlassian.net/projects/HHH/versions/35651
+
+** Bug
+    * [HHH-19853] - Gradle plugin org.hibernate.orm not published for 6.6.31 / 6.2.47
+
+
+Changes in 6.6.32.Final (October 09, 2025)
+------------------------------------------------------------------------------------------------------------------------
+
+https://hibernate.atlassian.net/projects/HHH/versions/35485
+
+** Bug
+    * [HHH-19853] - Gradle plugin org.hibernate.orm not published for 6.6.31 / 6.2.47
+
+
+Changes in 6.6.31.Final (October 03, 2025)
+------------------------------------------------------------------------------------------------------------------------
+
+https://hibernate.atlassian.net/projects/HHH/versions/35420
+
+** Bug
+    * [HHH-18885] - ClassCastException with queued persist in an extra lazy Map
+    * [HHH-18936] - remove parent with @OnDelete(CASCADE) leads to TransientObjectException
+
+** Task
+    * [HHH-19800] - Migrate to release scripts for documentation publishing
+
+
+Changes in 6.6.30.Final (September 29, 2025)
+------------------------------------------------------------------------------------------------------------------------
+
+https://hibernate.atlassian.net/projects/HHH/versions/35320
+
+** Bug
+    * [HHH-19784] - Bytecode enhancement generates wrong field access method for classes in different JARs but with same package name deployed in the same EAR
+    * [HHH-19768] - Wrong supportsRowValueConstructorSyntaxInInSubQuery leads to bad performing queries
+    * [HHH-19681] - AssertionError on extract results from  array containing jsonb values
+
+
+Changes in 6.6.29.Final (September 14, 2025)
+------------------------------------------------------------------------------------------------------------------------
+
+https://hibernate.atlassian.net/projects/HHH/versions/35156
+
+** Bug
+    * [HHH-19756] - Invalid SQL generated when using treat() with joined = discriminator inheritance and same attribute names
+    * [HHH-19747] - Hibernate Envers can not handle @EnumeratedValue annotation
+    * [HHH-19201] - BlobProxy with InputStream reads whole stream into a byte array
+
+
+Changes in 6.6.28.Final (August 31, 2025)
+------------------------------------------------------------------------------------------------------------------------
+
+https://hibernate.atlassian.net/projects/HHH/versions/35057
+
+** Bug
+    * [HHH-19740] - Collection table deletion for table per class subclass entity fails with UnknownTableReferenceException
+    * [HHH-19738] - JDBC password logged when specified via jakarta.persistence.jdbc.password
+    * [HHH-19734] - Cache hit of bytecode enhanced proxy with shallow query cache layout fails
+    * [HHH-19648] - Recursive @Embeddable mapping leads to stack overflow
+
+
+Changes in 6.6.27.Final (August 24, 2025)
+------------------------------------------------------------------------------------------------------------------------
+
+https://hibernate.atlassian.net/projects/HHH/versions/34957
+
+** Bug
+    * [HHH-19719] - org.hibernate.query.sqm.function.SelfRenderingSqmWindowFunction#appendHqlString throws IndexOutOfBoundsException  when has no arguments
+    * [HHH-19712] - Column deduplication leads to wrong alias calculation for native query alias expansion
+    * [HHH-19687] - Criteria query with lazy @OneToOne and @EmbeddedId throws exception
+
+
+Changes in 6.6.26.Final (August 17, 2025)
+------------------------------------------------------------------------------------------------------------------------
+
+https://hibernate.atlassian.net/projects/HHH/versions/34859
+
+** Bug
+    * [HHH-18968] - MySQLDialect wrongly uses Timestamp as type for localtime function
+    * [HHH-18621] - Hibernate 6 disregards hibernate.jdbc.batch_versioned_data
+
+
+Changes in 6.6.25.Final (August 10, 2025)
+------------------------------------------------------------------------------------------------------------------------
+
+https://hibernate.atlassian.net/projects/HHH/versions/34660
+
+** Bug
+    * [HHH-19453] - sequence support not working on db2 As400 7.3
+    * [HHH-17522] - Support correlation of CTEs
+
+
+Changes in 6.6.24.Final (August 03, 2025)
+------------------------------------------------------------------------------------------------------------------------
+
+https://hibernate.atlassian.net/projects/HHH/versions/34495
+
+** Bug
+    * [HHH-19675] - JdbcTypeRegistry#hasRegisteredDescriptor should account for constructed types
+    * [HHH-19657] - OffsetDateTime in an array is handled incorrectly with setting hibernate.type.java_time_use_direct_jdbc=true
+    * [HHH-19655] - Connection leak with PhysicalConnectionHandlingMode.IMMEDIATE_ACQUISITION_AND_HOLD
+    * [HHH-19651] - DB2 for i detection not working reliably
+    * [HHH-19585] - Object relationship mapping issues | java.lang.NullPointerException: Cannot invoke "java.lang.Comparable.compareTo(Object)" because "one" is null
+    * [HHH-19579] - Criteria update join - Column 'code' in SET is ambiguous
+    * [HHH-19031] - Loading an Entity a second time when it contains an embedded object causes IllegalArgumentException
+    * [HHH-18981] - IndexOutOfBoundsException when using arrayToString with arrayAgg
+    * [HHH-18956] - Native query brace replacement breaks dollar quoted literals in 6.6+
+    * [HHH-18780] - Performance regression on Postgres with polymorphic query due to incorrect casts of null columns
+
+
+Changes in 6.6.23.Final (July 27, 2025)
+------------------------------------------------------------------------------------------------------------------------
+
+https://hibernate.atlassian.net/projects/HHH/versions/34397
+
+** Bug
+    * [HHH-19575] - empty Struct should be fetched intact or not null
+    * [HHH-19524] - @OneToOne relationship unnecessary joins in nativeQuery
+    * [HHH-19261] - OracleDialect getQueryHintString incorrectly joins supplied hints
+    * [HHH-16253] - [Envers] Schema Validation Failure With Audited (N)Clob Column with Hibernate 6 on H2
+
+** Task
+    * [HHH-19639] - Add getter for EmbeddableFetchImpl#nullIndicatorResult
+
+
+Changes in 6.6.22.Final (July 20, 2025)
+------------------------------------------------------------------------------------------------------------------------
+
+https://hibernate.atlassian.net/projects/HHH/versions/34297
+
+** Bug
+    * [HHH-19621] - SUBSTRING function for DB2i Series is broken
+    * [HHH-19579] - Criteria update join - Column 'code' in SET is ambiguous
+    * [HHH-19550] - Attribute join on correlated from node receives wrong root
+    * [HHH-19524] - @OneToOne relationship unnecessary joins in nativeQuery
+    * [HHH-19457] - Inheritance with type JOINED not working in a related entity
+    * [HHH-19368] - Group by and single-table inheritance sub-select query error
+    * [HHH-19031] - Loading an Entity a second time when it contains an embedded object causes IllegalArgumentException
+
+** Task
+    * [HHH-19624] - Test EDB with the EDB drivers
+
+
+Changes in 6.6.21.Final (July 13, 2025)
+------------------------------------------------------------------------------------------------------------------------
+
+https://hibernate.atlassian.net/projects/HHH/versions/34199
+
+** Bug
+    * [HHH-19596] - NPE when array/collection of Struct contains null value
+    * [HHH-19542] - Embeddable in secondary table fails to recognize a nested embeddable is in the same table
+
+
+Changes in 6.6.20.Final (July 06, 2025)
+------------------------------------------------------------------------------------------------------------------------
+
+https://hibernate.atlassian.net/projects/HHH/versions/34165
+
+** Bug
+    * [HHH-19464] - Storing a binary data into BLOB on Oracle cutting off its content.
+    * [HHH-19396] - Cannot select the same column twice (with different aliases) while using CTE
+    * [HHH-19076] - expecting IdClass mapping sessionfactory error with specific @IdClass setup with inheritence
+    * [HHH-18898] - Specific mistake in HQL gives NullPointerException in AbstractSqlAstTranslator
+    * [HHH-18837] - Oracle epoch extraction doesn't work with dates
+    * [HHH-18581] - Performance degradation from Hibernate 5 to 6 on NativeQuery
+
+** Improvement
+    * [HHH-19558] - allow JDBC escapes in native SQL queries
+
+
+Changes in 6.6.19.Final (June 29, 2025)
+------------------------------------------------------------------------------------------------------------------------
+
+https://hibernate.atlassian.net/projects/HHH/versions/33968
+
+** Bug
+    * [HHH-18837] - Oracle epoch extraction doesn't work with dates
+    * [HHH-19547] - Misleading exception message at DefaultFlushEntityEventListener - mangled ID - misplaced Entity and EntityEntry ID
+    * [HHH-19560] - TupleTransformer and ResultListTransformer trash the query interpretation cache
+    * [HHH-19571] - CloningPropertyCall causes non-deterministic bytecode for AccessOptimizer
+    * [HHH-19573] - Presence of wrapper byte array pollutes BasicTypeRegistry
+    * [HHH-19577] - BytecodeProviderImpl.SetPropertyValues wrongly emits duplicate stack map frames
+
+
+Changes in 6.6.18.Final (June 13, 2025)
+------------------------------------------------------------------------------------------------------------------------
+
+https://hibernate.atlassian.net/projects/HHH/versions/33703
+
+** Bug
+    * [HHH-19533] - Implement equals() and hashCode() for NativeQueryConstructorTransformer
+    * [HHH-19529] - Check bytecode generated classes with stable names class loaders
+    * [HHH-18891] - java.lang.AssertionError generated in getResolvedInstance even though NotFound IGNORE set
+    * [HHH-18876] - ArrayInitializer#resolveInstanceSubInitializers should consider @ListIndexBase
+    * [HHH-18771] - ListInitializer should consistently consider @ListIndexBase
+
+
+Changes in 6.6.17.Final (May 28, 2025)
+------------------------------------------------------------------------------------------------------------------------
+
+https://hibernate.atlassian.net/projects/HHH/versions/33638
+
+** Bug
+    * [HHH-19490] - NPE when using array_position function
+    * [HHH-19476] - claimEntityHolderIfPossible Assertion Error
+    * [HHH-19387] - AssertionError in EntityInitializerImpl data.concreteDescriptor is null
+    * [HHH-18946] - Startup issues with HANA in failover situations
+
+
+Changes in 6.6.16.Final (May 25, 2025)
+------------------------------------------------------------------------------------------------------------------------
+
+https://hibernate.atlassian.net/projects/HHH/versions/33606
+
+** Bug
+    * [HHH-19477] - ConnectionReleaseMode.AFTER_STATEMENT ineffective due to missing connection release
+    * [HHH-19473] - Bytecode enhancement incorrectly generates code for Bidirectional Generic Entities
+    * [HHH-19472] - Native query "SELECT 1" with result type Object[] return singular object
+    * [HHH-19387] - AssertionError in EntityInitializerImpl data.concreteDescriptor is null
+    * [HHH-19372] - AccessOptimizer.setPropertyValues() and getPropertyValues() error with entity hierarchy.
+    * [HHH-19369] - Entity hierarchy ordering error within metamodel building with enhancement
+    * [HHH-19207] - JPA OrderBy annotated relation not ordered when using entity graph with criteria api
+    * [HHH-18813] - DML update of secondary table column fails
+
+
+Changes in 6.6.15.Final (May 13, 2025)
+------------------------------------------------------------------------------------------------------------------------
+
+https://hibernate.atlassian.net/projects/HHH/versions/33406
+
+** Bug
+    * [HHH-19458] - problem starting MockSessionFactory from Quarkus dev mode with Reactive
+
+
+Changes in 6.6.14.Final (May 11, 2025)
+------------------------------------------------------------------------------------------------------------------------
+
+https://hibernate.atlassian.net/projects/HHH/versions/33241
+
+** Bug
+    * [HHH-19425] - incorrect class literals in Processor-generated code
+    * [HHH-19375] - fix check for presence of Quarkus in reactive case
+    * [HHH-19374] - repositories should always be @Dependent
+    * [HHH-19320] - Assigned id value is not passed into BeforeExecutionGenerator#generate() method when allowAssignedIdentifiers() is true and id has been assigned
+    * [HHH-19314] - StackOverflowException when using onConflict with createCriteriaInsertValues and createCriteriaInsertSelect
+    * [HHH-19306] - Composite generator may not respect the event types of generators it consits of
+    * [HHH-19036] - ORM Filter are searched for in the wrong order
+
 
 Changes in 6.6.13.Final (April 06, 2025)
 ------------------------------------------------------------------------------------------------------------------------

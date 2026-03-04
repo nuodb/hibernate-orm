@@ -34,7 +34,6 @@ pipeline {
                 label 'LongDuration'
             }
         	steps {
-                requireApprovalForPullRequest 'hibernate'
 				script {
 					dir('hibernate') {
 						checkout scm
@@ -47,10 +46,7 @@ pipeline {
 						}
 					}
 					dir('quarkus') {
-						sh "git clone -b 3.15 --single-branch https://github.com/quarkusio/quarkus.git . || git reset --hard && git clean -fx && git pull"
-						// This is a temporary workaround because Quarkus reverted the Hibernate ORM and Reactive upgrade.
-						// Remove this once Quarkus upgrades the versions again
-						sh "git reset --hard f42166ee7041ed09b7183d5dbf3ece2439b16676"
+						sh "git clone -b remove-dead-code-3.20 --single-branch https://github.com/yrodiere/quarkus.git . || git reset --hard && git clean -fx && git pull"
         				script {
 							def sedStatus = sh (script: "sed -i 's@<hibernate-orm.version>.*</hibernate-orm.version>@<hibernate-orm.version>${env.HIBERNATE_VERSION}</hibernate-orm.version>@' pom.xml", returnStatus: true)
 							if ( sedStatus != 0 ) {

@@ -6,12 +6,15 @@
  */
 package org.hibernate.community.dialect;
 
+import java.util.List;
+
 import org.hibernate.dialect.DatabaseVersion;
 import org.hibernate.engine.spi.SessionFactoryImplementor;
 import org.hibernate.query.sqm.ComparisonOperator;
 import org.hibernate.sql.ast.tree.Statement;
 import org.hibernate.sql.ast.tree.expression.Expression;
 import org.hibernate.sql.ast.tree.expression.Literal;
+import org.hibernate.sql.ast.tree.expression.SqlTupleContainer;
 import org.hibernate.sql.ast.tree.select.QueryPart;
 import org.hibernate.sql.exec.spi.JdbcOperation;
 
@@ -42,20 +45,34 @@ public class DB2iLegacySqlAstTranslator<T extends JdbcOperation> extends DB2Lega
 		if ( useOffsetFetchClause( queryPart ) && !isRowsOnlyFetchClauseType( queryPart ) ) {
 			return true;
 		}
-		// According to LegacyDB2LimitHandler, variable limit also isn't supported before 7.10
-		return  version.isBefore(7, 10)
+		// According to LegacyDB2LimitHandler, variable limit also isn't supported before 7.1
+		return version.isBefore(7, 1)
 				&& queryPart.getFetchClauseExpression() != null
 				&& !( queryPart.getFetchClauseExpression() instanceof Literal );
 	}
 
 	@Override
 	protected boolean supportsOffsetClause() {
-		return version.isSameOrAfter(7, 10);
+		return version.isSameOrAfter(7, 1);
 	}
 
 	@Override
 	protected void renderComparison(Expression lhs, ComparisonOperator operator, Expression rhs) {
 		renderComparisonStandard( lhs, operator, rhs );
+	}
+
+	@Override
+	protected void renderExpressionsAsValuesSubquery(int tupleSize, List<Expression> listExpressions) {
+		// DB2 for i supports type-inference in this special VALUES expression, but not if it's wrapped as SELECT
+		appendSql( "values" );
+		char separator = ' ';
+		for ( Expression expression : listExpressions ) {
+			appendSql( separator );
+			appendSql( OPEN_PARENTHESIS );
+			renderCommaSeparated( SqlTupleContainer.getSqlTuple( expression ).getExpressions() );
+			appendSql( CLOSE_PARENTHESIS );
+			separator = ',';
+		}
 	}
 
 	@Override

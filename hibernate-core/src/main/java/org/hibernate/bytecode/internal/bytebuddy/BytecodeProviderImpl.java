@@ -16,10 +16,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Callable;
 
 import org.hibernate.HibernateException;
 import org.hibernate.bytecode.enhance.internal.bytebuddy.EnhancerClassLocator;
@@ -76,6 +74,7 @@ public class BytecodeProviderImpl implements BytecodeProvider {
 
 	private static final String INSTANTIATOR_PROXY_NAMING_SUFFIX = "HibernateInstantiator";
 	private static final String OPTIMIZER_PROXY_NAMING_SUFFIX = "HibernateAccessOptimizer";
+	private static final String OPTIMIZER_PROXY_BRIDGE_NAMING_SUFFIX = "HibernateAccessOptimizerBridge";
 	private static final ElementMatcher.Junction<NamedElement> newInstanceMethodName = ElementMatchers.named(
 			"newInstance" );
 	private static final ElementMatcher.Junction<NamedElement> getPropertyValuesMethodName = ElementMatchers.named(
@@ -184,7 +183,7 @@ public class BytecodeProviderImpl implements BytecodeProvider {
 				.method( setPropertyValuesMethodName )
 				.intercept( new Implementation.Simple( new SetPropertyValues( clazz, getterNames, setters ) ) )
 				.method( getPropertyNamesMethodName )
-				.intercept( MethodCall.call( new CloningPropertyCall( getterNames ) ) )
+				.intercept( new Implementation.Simple( new GetPropertyNames( getterNames ) ) )
 		);
 
 		try {
@@ -253,7 +252,7 @@ public class BytecodeProviderImpl implements BytecodeProvider {
 					.method( setPropertyValuesMethodName )
 					.intercept( new Implementation.Simple( new SetPropertyValues( clazz, propertyNames, setters ) ) )
 					.method( getPropertyNamesMethodName )
-					.intercept( MethodCall.call( new CloningPropertyCall( propertyNames ) ) )
+					.intercept( new Implementation.Simple( new GetPropertyNames( propertyNames ) ) )
 			);
 		}
 		else {
@@ -266,7 +265,7 @@ public class BytecodeProviderImpl implements BytecodeProvider {
 					.method( setPropertyValuesMethodName )
 					.intercept( new Implementation.Simple( new SetPropertyValues( clazz, propertyNames, setters ) ) )
 					.method( getPropertyNamesMethodName )
-					.intercept( MethodCall.call( new CloningPropertyCall( propertyNames ) ) )
+					.intercept( new Implementation.Simple( new GetPropertyNames( propertyNames ) ) )
 			);
 		}
 
@@ -281,13 +280,13 @@ public class BytecodeProviderImpl implements BytecodeProvider {
 		}
 	}
 
-	private static class ForeignPackageClassInfo {
+	private static class BridgeMembersClassInfo {
 		final Class<?> clazz;
 		final List<String> propertyNames = new ArrayList<>();
 		final List<Member> getters = new ArrayList<>();
 		final List<Member> setters = new ArrayList<>();
 
-		public ForeignPackageClassInfo(Class<?> clazz) {
+		public BridgeMembersClassInfo(Class<?> clazz) {
 			this.clazz = clazz;
 		}
 	}
@@ -296,93 +295,75 @@ public class BytecodeProviderImpl implements BytecodeProvider {
 		if ( clazz.isInterface() ) {
 			return Object.class;
 		}
-		// generate access optimizer super classes for foreign package super classes that declare fields
+		// generate access optimizer super classes for super classes that declare members requiring bridge methods
 		//  each should declare protected static methods get_FIELDNAME(OWNER)/set_FIELDNAME(OWNER, TYPE)
 		//  which should be called then from within GetPropertyValues/SetPropertyValues
 		//  Since these super classes will be in the correct package, the package-private entity field access is fine
-		final List<ForeignPackageClassInfo> foreignPackageClassInfos = createForeignPackageClassInfos( clazz );
-		for ( Iterator<ForeignPackageClassInfo> iterator = foreignPackageClassInfos.iterator(); iterator.hasNext(); ) {
-			final ForeignPackageClassInfo foreignPackageClassInfo = iterator.next();
-			for ( int i = 0; i < getters.length; i++ ) {
-				final Member getter = getters[i];
-				final Member setter = setters[i];
-				boolean found = false;
-				if ( getter.getDeclaringClass() == foreignPackageClassInfo.clazz && !Modifier.isPublic( getter.getModifiers() ) ) {
-					foreignPackageClassInfo.getters.add( getter );
-					found = true;
-				}
-				if ( setter.getDeclaringClass() == foreignPackageClassInfo.clazz && !Modifier.isPublic( setter.getModifiers() ) ) {
-					foreignPackageClassInfo.setters.add( setter );
-					found = true;
-				}
-				if ( found ) {
-					foreignPackageClassInfo.propertyNames.add( propertyNames[i] );
-				}
-			}
-			if ( foreignPackageClassInfo.getters.isEmpty() && foreignPackageClassInfo.setters.isEmpty() ) {
-				iterator.remove();
-			}
-		}
+		final List<BridgeMembersClassInfo> bridgeMembersClassInfos = createBridgeMembersClassInfos( clazz, getters, setters, propertyNames );
 
 		Class<?> superClass = Object.class;
-		for ( int i = foreignPackageClassInfos.size() - 1; i >= 0; i-- ) {
-			final ForeignPackageClassInfo foreignPackageClassInfo = foreignPackageClassInfos.get( i );
+		for ( int i = bridgeMembersClassInfos.size() - 1; i >= 0; i-- ) {
+			final BridgeMembersClassInfo bridgeMembersClassInfo = bridgeMembersClassInfos.get( i );
 			final Class<?> newSuperClass = superClass;
 
-			final String className = foreignPackageClassInfo.clazz.getName() + "$" + OPTIMIZER_PROXY_NAMING_SUFFIX + encodeName( foreignPackageClassInfo.propertyNames, foreignPackageClassInfo.getters, foreignPackageClassInfo.setters );
+			final String className = bridgeMembersClassInfo.clazz.getName() + "$" + OPTIMIZER_PROXY_BRIDGE_NAMING_SUFFIX + encodeName( bridgeMembersClassInfo.propertyNames, bridgeMembersClassInfo.getters, bridgeMembersClassInfo.setters );
 			superClass = byteBuddyState.load(
-					foreignPackageClassInfo.clazz,
+					bridgeMembersClassInfo.clazz,
 					className,
 					(byteBuddy, namingStrategy) -> {
 						DynamicType.Builder<?> builder = byteBuddy.with( namingStrategy ).subclass( newSuperClass );
-						for ( Member getter : foreignPackageClassInfo.getters ) {
-							final Class<?> getterType;
-							if ( getter instanceof Field ) {
-								getterType = ( (Field) getter ).getType();
-							}
-							else {
-								getterType = ( (Method) getter ).getReturnType();
-							}
+						for ( Member getter : bridgeMembersClassInfo.getters ) {
+							if ( !Modifier.isPublic( getter.getModifiers() ) ) {
+								final Class<?> getterType;
+								if ( getter instanceof Field ) {
+									getterType = ( (Field) getter ).getType();
+								}
+								else {
+									getterType = ( (Method) getter ).getReturnType();
+								}
 
-							builder = builder.defineMethod(
-											"get_" + getter.getName(),
-											TypeDescription.Generic.OfNonGenericType.ForLoadedType.of(
-													getterType
-											),
-											Opcodes.ACC_PROTECTED | Opcodes.ACC_STATIC
-									)
-									.withParameter( foreignPackageClassInfo.clazz )
-									.intercept(
-											new Implementation.Simple(
-													new GetFieldOnArgument(
-															getter
-													)
-											)
-									);
+								builder = builder.defineMethod(
+												"get_" + getter.getName(),
+												TypeDescription.Generic.OfNonGenericType.ForLoadedType.of(
+														getterType
+												),
+												Opcodes.ACC_PROTECTED | Opcodes.ACC_STATIC
+										)
+										.withParameter( bridgeMembersClassInfo.clazz )
+										.intercept(
+												new Implementation.Simple(
+														new GetFieldOnArgument(
+																getter
+														)
+												)
+										);
+							}
 						}
-						for ( Member setter : foreignPackageClassInfo.setters ) {
-							final Class<?> setterType;
-							if ( setter instanceof Field ) {
-								setterType = ( (Field) setter ).getType();
-							}
-							else {
-								setterType = ( (Method) setter ).getParameterTypes()[0];
-							}
+						for ( Member setter : bridgeMembersClassInfo.setters ) {
+							if ( !Modifier.isPublic( setter.getModifiers() ) ) {
+								final Class<?> setterType;
+								if ( setter instanceof Field ) {
+									setterType = ( (Field) setter ).getType();
+								}
+								else {
+									setterType = ( (Method) setter ).getParameterTypes()[0];
+								}
 
-							builder = builder.defineMethod(
-											"set_" + setter.getName(),
-											TypeDescription.Generic.VOID,
-											Opcodes.ACC_PROTECTED | Opcodes.ACC_STATIC
-									)
-									.withParameter( foreignPackageClassInfo.clazz )
-									.withParameter( setterType )
-									.intercept(
-											new Implementation.Simple(
-													new SetFieldOnArgument(
-															setter
-													)
-											)
-									);
+								builder = builder.defineMethod(
+												"set_" + setter.getName(),
+												TypeDescription.Generic.VOID,
+												Opcodes.ACC_PROTECTED | Opcodes.ACC_STATIC
+										)
+										.withParameter( bridgeMembersClassInfo.clazz )
+										.withParameter( setterType )
+										.intercept(
+												new Implementation.Simple(
+														new SetFieldOnArgument(
+																setter
+														)
+												)
+										);
+							}
 						}
 
 						return builder;
@@ -392,10 +373,10 @@ public class BytecodeProviderImpl implements BytecodeProvider {
 			for ( int j = 0; j < getters.length; j++ ) {
 				final Member getter = getters[j];
 				final Member setter = setters[j];
-				if ( foreignPackageClassInfo.getters.contains( getter ) ) {
+				if ( bridgeMembersClassInfo.getters.contains( getter ) && !Modifier.isPublic( getter.getModifiers() ) ) {
 					getters[j] = new ForeignPackageMember( superClass, getter );
 				}
-				if ( foreignPackageClassInfo.setters.contains( setter ) ) {
+				if ( bridgeMembersClassInfo.setters.contains( setter ) && !Modifier.isPublic( setter.getModifiers() ) ) {
 					setters[j] = new ForeignPackageMember( superClass, setter );
 				}
 			}
@@ -619,16 +600,31 @@ public class BytecodeProviderImpl implements BytecodeProvider {
 		}
 	}
 
-	private List<ForeignPackageClassInfo> createForeignPackageClassInfos(Class<?> clazz) {
-		final List<ForeignPackageClassInfo> foreignPackageClassInfos = new ArrayList<>();
+	private List<BridgeMembersClassInfo> createBridgeMembersClassInfos(
+			Class<?> clazz,
+			Member[] getters,
+			Member[] setters,
+			String[] propertyNames) {
+		final List<BridgeMembersClassInfo> bridgeMembersClassInfos = new ArrayList<>();
 		Class<?> c = clazz.getSuperclass();
 		while (c != Object.class) {
-			if ( !c.getPackageName().equals( clazz.getPackageName() ) ) {
-				foreignPackageClassInfos.add( new ForeignPackageClassInfo( c ) );
+			final BridgeMembersClassInfo bridgeMemberClassInfo = new BridgeMembersClassInfo( c );
+			for ( int i = 0; i < getters.length; i++ ) {
+				final Member getter = getters[i];
+				final Member setter = setters[i];
+				if ( getter.getDeclaringClass() == c && !Modifier.isPublic( getter.getModifiers() )
+						|| setter.getDeclaringClass() == c && !Modifier.isPublic( setter.getModifiers() ) ) {
+					bridgeMemberClassInfo.getters.add( getter );
+					bridgeMemberClassInfo.setters.add( setter );
+					bridgeMemberClassInfo.propertyNames.add( propertyNames[i] );
+				}
+			}
+			if ( !bridgeMemberClassInfo.propertyNames.isEmpty() ) {
+				bridgeMembersClassInfos.add( bridgeMemberClassInfo );
 			}
 			c = c.getSuperclass();
 		}
-		return foreignPackageClassInfos;
+		return bridgeMembersClassInfos;
 	}
 
 	public ByteBuddyProxyHelper getByteBuddyProxyHelper() {
@@ -890,16 +886,16 @@ public class BytecodeProviderImpl implements BytecodeProvider {
 			Label nextLabel = new Label();
 			for ( int index = 0; index < setters.length; index++ ) {
 				final Member setterMember = setters[index];
-				if ( enhanced && currentLabel != null ) {
+				if ( setterMember == EMBEDDED_MEMBER ) {
+					// The embedded property access does a no-op
+					continue;
+				}
+				if ( currentLabel != null ) {
 					methodVisitor.visitLabel( currentLabel );
 					implementationContext.getFrameGeneration().same(
 							methodVisitor,
 							instrumentedMethod.getParameters().asTypeList()
 					);
-				}
-				if ( setterMember == EMBEDDED_MEMBER ) {
-					// The embedded property access does a no-op
-					continue;
 				}
 				// Push entity on stack
 				methodVisitor.visitVarInsn( Opcodes.ALOAD, 1 );
@@ -1032,6 +1028,7 @@ public class BytecodeProviderImpl implements BytecodeProvider {
 				}
 				if ( enhanced ) {
 					final boolean compositeTracker = CompositeTracker.class.isAssignableFrom( type );
+					boolean alreadyHasFrame = false;
 					// The composite owner check and setting only makes sense if
 					//  * the value type is a composite tracker
 					//  * a value subtype can be a composite tracker
@@ -1113,6 +1110,7 @@ public class BytecodeProviderImpl implements BytecodeProvider {
 						// Clean stack after the if block
 						methodVisitor.visitLabel( compositeTrackerEndLabel );
 						implementationContext.getFrameGeneration().same(methodVisitor, instrumentedMethod.getParameters().asTypeList());
+						alreadyHasFrame = true;
 					}
 					if ( persistentAttributeInterceptable ) {
 						// Load the owner
@@ -1177,9 +1175,20 @@ public class BytecodeProviderImpl implements BytecodeProvider {
 						// Clean stack after the if block
 						methodVisitor.visitLabel( instanceofEndLabel );
 						implementationContext.getFrameGeneration().same(methodVisitor, instrumentedMethod.getParameters().asTypeList());
+						alreadyHasFrame = true;
 					}
 
-					currentLabel = nextLabel;
+					if ( alreadyHasFrame ) {
+						// Usually, the currentLabel is visited as well generating a frame,
+						// but if a frame was already generated, only visit the label here,
+						// otherwise two frames for the same bytecode index are generated,
+						// which is wrong and will produce an error when the JDK ClassFile API is used
+						methodVisitor.visitLabel( nextLabel );
+						currentLabel = null;
+					}
+					else {
+						currentLabel = nextLabel;
+					}
 					nextLabel = new Label();
 				}
 			}
@@ -1349,17 +1358,29 @@ public class BytecodeProviderImpl implements BytecodeProvider {
 		}
 	}
 
-	public static class CloningPropertyCall implements Callable<String[]> {
+	public static class GetPropertyNames implements ByteCodeAppender {
 
 		private final String[] propertyNames;
 
-		private CloningPropertyCall(String[] propertyNames) {
+		private GetPropertyNames(String[] propertyNames) {
 			this.propertyNames = propertyNames;
 		}
 
 		@Override
-		public String[] call() {
-			return propertyNames.clone();
+		public Size apply(
+				MethodVisitor methodVisitor,
+				Implementation.Context implementationContext,
+				MethodDescription instrumentedMethod) {
+			methodVisitor.visitLdcInsn( propertyNames.length );
+			methodVisitor.visitTypeInsn( Opcodes.ANEWARRAY, Type.getInternalName( String.class ) );
+			for ( int i = 0; i < propertyNames.length; i++ ) {
+				methodVisitor.visitInsn( Opcodes.DUP );
+				methodVisitor.visitLdcInsn( i );
+				methodVisitor.visitLdcInsn( propertyNames[i] );
+				methodVisitor.visitInsn( Opcodes.AASTORE );
+			}
+			methodVisitor.visitInsn( Opcodes.ARETURN );
+			return new Size( 4, instrumentedMethod.getStackSize() + 1 );
 		}
 	}
 

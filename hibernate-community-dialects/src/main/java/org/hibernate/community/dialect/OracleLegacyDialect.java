@@ -13,6 +13,7 @@ import java.sql.SQLException;
 import java.sql.Types;
 import java.time.temporal.ChronoField;
 import java.time.temporal.TemporalAccessor;
+import java.util.List;
 import java.util.Locale;
 import java.util.TimeZone;
 import java.util.regex.Matcher;
@@ -27,6 +28,7 @@ import org.hibernate.dialect.BooleanDecoder;
 import org.hibernate.dialect.DmlTargetColumnQualifierSupport;
 import org.hibernate.dialect.DatabaseVersion;
 import org.hibernate.dialect.Dialect;
+import org.hibernate.dialect.OracleServerConfiguration;
 import org.hibernate.dialect.OracleBooleanJdbcType;
 import org.hibernate.dialect.OracleJdbcHelper;
 import org.hibernate.dialect.OracleJsonJdbcType;
@@ -115,8 +117,10 @@ import org.hibernate.type.spi.TypeConfiguration;
 
 import jakarta.persistence.TemporalType;
 
+import static java.lang.String.join;
 import static java.util.regex.Pattern.CASE_INSENSITIVE;
 import static org.hibernate.exception.spi.TemplatedViolatedConstraintNameExtractor.extractUsingTemplate;
+import static org.hibernate.internal.util.StringHelper.isEmpty;
 import static org.hibernate.query.sqm.TemporalUnit.DAY;
 import static org.hibernate.query.sqm.TemporalUnit.HOUR;
 import static org.hibernate.query.sqm.TemporalUnit.MINUTE;
@@ -185,16 +189,54 @@ public class OracleLegacyDialect extends Dialect {
 	private final UniqueDelegate uniqueDelegate = new CreateTableUniqueDelegate(this);
 	private final SequenceSupport oracleSequenceSupport = OracleSequenceSupport.getInstance(this);
 
+	// Is it an Autonomous Database Cloud Service?
+	protected final boolean autonomous;
+
+	// Is MAX_STRING_SIZE set to EXTENDED?
+	protected final boolean extended;
+
+	// Is the database accessed using a database service protected by Application Continuity.
+	protected final boolean applicationContinuity;
+
+	protected final int driverMajorVersion;
+	protected final int driverMinorVersion;
+
 	public OracleLegacyDialect() {
 		this( DatabaseVersion.make( 8, 0 ) );
 	}
 
 	public OracleLegacyDialect(DatabaseVersion version) {
-		super(version);
+		super( version );
+		autonomous = false;
+		extended = false;
+		applicationContinuity = false;
+		driverMajorVersion = 19;
+		driverMinorVersion = 0;
 	}
 
 	public OracleLegacyDialect(DialectResolutionInfo info) {
-		super(info);
+		this( info, OracleServerConfiguration.fromDialectResolutionInfo( info ) );
+	}
+
+	public OracleLegacyDialect(DialectResolutionInfo info, OracleServerConfiguration serverConfiguration) {
+		super( info );
+		autonomous = serverConfiguration.isAutonomous();
+		extended = serverConfiguration.isExtended();
+		applicationContinuity = serverConfiguration.isApplicationContinuity();
+		this.driverMinorVersion = serverConfiguration.getDriverMinorVersion();
+		this.driverMajorVersion = serverConfiguration.getDriverMajorVersion();
+	}
+
+	public boolean isAutonomous() {
+		return autonomous;
+	}
+
+	public boolean isExtended() {
+		return extended;
+	}
+
+	public boolean isApplicationContinuity() {
+		return applicationContinuity;
 	}
 
 	@Override
@@ -1217,6 +1259,17 @@ public class OracleLegacyDialect extends Dialect {
 	}
 
 	@Override
+	public String getQueryHintString(String query, List<String> hintList) {
+		if ( hintList.isEmpty() ) {
+			return query;
+		}
+		else {
+			final String hints = join( " ", hintList );
+			return isEmpty( hints ) ? query : getQueryHintString( query, hints );
+		}
+	}
+
+	@Override
 	public String getQueryHintString(String sql, String hints) {
 		final String statementType = statementType( sql );
 		final int start = sql.indexOf( statementType );
@@ -1573,10 +1626,10 @@ public class OracleLegacyDialect extends Dialect {
 
 	@Override
 	public boolean useInputStreamToInsertBlob() {
-		// see HHH-18206
-		return false;
+		// If application continuity is enabled, don't use stream bindings, since a replay could otherwise fail
+		// if the underlying stream doesn't support mark and reset
+		return !isApplicationContinuity();
 	}
-
 	@Override
 	public String getDual() {
 		return "dual";

@@ -333,6 +333,7 @@ import static org.hibernate.internal.util.collections.CollectionHelper.setOfSize
 import static org.hibernate.internal.util.collections.CollectionHelper.toSmallList;
 import static org.hibernate.loader.ast.internal.MultiKeyLoadHelper.supportsSqlArrayType;
 import static org.hibernate.metamodel.RepresentationMode.POJO;
+import static org.hibernate.metamodel.mapping.MappingModelHelper.isCompatibleModelPart;
 import static org.hibernate.persister.entity.DiscriminatorHelper.NOT_NULL_DISCRIMINATOR;
 import static org.hibernate.persister.entity.DiscriminatorHelper.NULL_DISCRIMINATOR;
 import static org.hibernate.pretty.MessageHelper.infoString;
@@ -1999,61 +2000,62 @@ public abstract class AbstractEntityPersister
 		// Wrap expressions with aliases
 		final SelectClause selectClause = rootQuerySpec.getSelectClause();
 		final List<SqlSelection> sqlSelections = selectClause.getSqlSelections();
+		final Set<String> processedExpressions = new HashSet<>( sqlSelections.size() );
 		int i = 0;
-		int columnIndex = 0;
-		final String[] columnAliases = getSubclassColumnAliasClosure();
-		final int columnAliasesSize = columnAliases.length;
-		for ( String identifierAlias : identifierAliases ) {
-			sqlSelections.set(
-					i,
-					new SqlSelectionImpl(
-							i,
-							new AliasedExpression( sqlSelections.get( i ).getExpression(), identifierAlias + suffix )
-					)
-			);
-			if ( i < columnAliasesSize && columnAliases[i].equals( identifierAlias ) ) {
-				columnIndex++;
+		final int identifierSelectionSize = identifierMapping.getJdbcTypeCount();
+		for ( int j = 0; j < identifierSelectionSize; j++ ) {
+			final SelectableMapping selectableMapping = identifierMapping.getSelectable( j );
+			if ( processedExpressions.add( selectableMapping.getSelectionExpression() ) ) {
+				aliasSelection( sqlSelections, i, identifierAliases[j] + suffix );
+				i++;
 			}
-			i++;
 		}
 
-		if ( entityMetamodel.hasSubclasses() ) {
-			sqlSelections.set(
-					i,
-					new SqlSelectionImpl(
-							i,
-							new AliasedExpression( sqlSelections.get( i ).getExpression(), getDiscriminatorAlias() + suffix )
-					)
-			);
-			i++;
+		if ( hasSubclasses() ) {
+			assert discriminatorMapping.getJdbcTypeCount() == 1;
+			final SelectableMapping selectableMapping = discriminatorMapping.getSelectable( 0 );
+			if ( processedExpressions.add( selectableMapping.getSelectionExpression() ) ) {
+				aliasSelection( sqlSelections, i, getDiscriminatorAlias() + suffix );
+				i++;
+			}
 		}
 
 		if ( hasRowId() ) {
-			sqlSelections.set(
-					i,
-					new SqlSelectionImpl(
-							i,
-							new AliasedExpression( sqlSelections.get( i ).getExpression(), ROWID_ALIAS + suffix )
-					)
-			);
-			i++;
+			final SelectableMapping selectableMapping = rowIdMapping;
+			if ( processedExpressions.add( selectableMapping.getSelectionExpression() ) ) {
+				aliasSelection( sqlSelections, i, ROWID_ALIAS + suffix );
+				i++;
+			}
 		}
 
+		final String[] columnAliases = getSubclassColumnAliasClosure();
 		final String[] formulaAliases = getSubclassFormulaAliasClosure();
+		int columnIndex = 0;
 		int formulaIndex = 0;
-		for ( ; i < sqlSelections.size(); i++ ) {
-			final SqlSelection sqlSelection = sqlSelections.get( i );
-			final ColumnReference columnReference = (ColumnReference) sqlSelection.getExpression();
-			final String selectAlias = !columnReference.isColumnExpressionFormula()
-					? columnAliases[columnIndex++] + suffix
-					: formulaAliases[formulaIndex++] + suffix;
-			sqlSelections.set(
-					i,
-					new SqlSelectionImpl(
-							sqlSelection.getValuesArrayPosition(),
-							new AliasedExpression( sqlSelection.getExpression(), selectAlias )
-					)
-			);
+		final int size = getNumberOfFetchables();
+		// getSubclassColumnAliasClosure contains the _identifierMapper columns when it has an id class,
+		// which need to be skipped
+		if ( identifierMapping instanceof NonAggregatedIdentifierMapping
+				&& ( (NonAggregatedIdentifierMapping) identifierMapping ).getIdClassEmbeddable() != null ) {
+			columnIndex = identifierSelectionSize;
+		}
+		for ( int j = 0; j < size; j++ ) {
+			final AttributeMapping fetchable = getFetchable( j );
+			if ( !(fetchable instanceof PluralAttributeMapping)
+					&& !skipFetchable( fetchable, fetchable.getMappedFetchOptions().getTiming() )
+					&& fetchable.isSelectable() ) {
+				final int jdbcTypeCount = fetchable.getJdbcTypeCount();
+				for ( int k = 0; k < jdbcTypeCount; k++ ) {
+					final SelectableMapping selectableMapping = fetchable.getSelectable( k );
+					if ( processedExpressions.add( selectableMapping.getSelectionExpression() ) ) {
+						final String baseAlias = selectableMapping.isFormula()
+								? formulaAliases[formulaIndex++]
+								: columnAliases[columnIndex++];
+						aliasSelection( sqlSelections, i, baseAlias + suffix );
+						i++;
+					}
+				}
+			}
 		}
 
 		final String sql = getFactory().getJdbcServices()
@@ -2073,6 +2075,17 @@ public abstract class AbstractEntityPersister
 		return expression;
 	}
 
+	private static void aliasSelection(
+			List<SqlSelection> sqlSelections,
+			int selectionIndex,
+			String alias) {
+		final Expression expression = sqlSelections.get( selectionIndex ).getExpression();
+		sqlSelections.set(
+				selectionIndex,
+				new SqlSelectionImpl( selectionIndex, new AliasedExpression( expression, alias ) )
+		);
+	}
+
 	private ImmutableFetchList fetchProcessor(FetchParent fetchParent, LoaderSqlAstCreationState creationState) {
 		final FetchableContainer fetchableContainer = fetchParent.getReferencedMappingContainer();
 		final int size = fetchableContainer.getNumberOfFetchables();
@@ -2083,43 +2096,43 @@ public abstract class AbstractEntityPersister
 			// Ignore plural attributes
 			if ( !( fetchable instanceof PluralAttributeMapping ) ) {
 				final FetchTiming fetchTiming = fetchable.getMappedFetchOptions().getTiming();
-				if ( fetchable.asBasicValuedModelPart() != null ) {
-					// Ignore lazy basic columns
-					if ( fetchTiming == FetchTiming.DELAYED ) {
-						continue;
+				if ( !skipFetchable( fetchable, fetchTiming ) ) {
+					if ( fetchTiming == null ) {
+						throw new AssertionFailure( "fetchTiming was null" );
 					}
-				}
-				else if ( fetchable instanceof Association ) {
-					final Association association = (Association) fetchable;
-					// Ignore the fetchable if the FK is on the other side
-					if ( association.getSideNature() == ForeignKeyDescriptor.Nature.TARGET ) {
-						continue;
+					if ( fetchable.isSelectable() ) {
+						final Fetch fetch = fetchParent.generateFetchableFetch(
+								fetchable,
+								fetchParent.resolveNavigablePath( fetchable ),
+								fetchTiming,
+								false,
+								null,
+								creationState
+						);
+						fetches.add( fetch );
 					}
-					// Ensure the FK comes from the root table
-					if ( !getRootTableName().equals( association.getForeignKeyDescriptor().getKeyTable() ) ) {
-						continue;
-					}
-				}
-
-				if ( fetchTiming == null ) {
-					throw new AssertionFailure("fetchTiming was null");
-				}
-
-				if ( fetchable.isSelectable() ) {
-					final Fetch fetch = fetchParent.generateFetchableFetch(
-							fetchable,
-							fetchParent.resolveNavigablePath( fetchable ),
-							fetchTiming,
-							false,
-							null,
-							creationState
-					);
-					fetches.add( fetch );
 				}
 			}
 		}
 
 		return fetches.build();
+	}
+
+	private boolean skipFetchable(Fetchable fetchable, FetchTiming fetchTiming) {
+		if ( fetchable.asBasicValuedModelPart() != null ) {
+			// Ignore lazy basic columns
+			return fetchTiming == FetchTiming.DELAYED;
+		}
+		else if ( fetchable instanceof Association ) {
+			final Association association = (Association) fetchable;
+			// Ignore the fetchable if the FK is on the other side
+			return association.getSideNature() == ForeignKeyDescriptor.Nature.TARGET
+					// Ensure the FK comes from the root table
+					|| !getRootTableName().equals( association.getForeignKeyDescriptor().getKeyTable() );
+		}
+		else {
+			return false;
+		}
 	}
 
 	/**
@@ -6207,50 +6220,30 @@ public abstract class AbstractEntityPersister
 			}
 		}
 
-		if ( treatTargetType != null ) {
-			if ( ! treatTargetType.isTypeOrSuperType( this ) ) {
-				return null;
-			}
-
-			if ( subclassMappingTypes != null && !subclassMappingTypes.isEmpty() ) {
-				for ( EntityMappingType subMappingType : subclassMappingTypes.values() ) {
-					if ( ! treatTargetType.isTypeOrSuperType( subMappingType ) ) {
-						continue;
-					}
-
-					final ModelPart subDefinedAttribute = subMappingType.findSubTypesSubPart( name, treatTargetType );
-
-					if ( subDefinedAttribute != null ) {
-						return subDefinedAttribute;
-					}
-				}
+		if ( treatTargetType == null ) {
+			final var subDefinedAttribute = findSubPartInSubclassMappings( name );
+			if ( subDefinedAttribute != null ) {
+				return subDefinedAttribute;
 			}
 		}
-		else {
-			if ( subclassMappingTypes != null && !subclassMappingTypes.isEmpty() ) {
-				ModelPart attribute = null;
-				for ( EntityMappingType subMappingType : subclassMappingTypes.values() ) {
-					final ModelPart subDefinedAttribute = subMappingType.findSubTypesSubPart( name, treatTargetType );
-					if ( subDefinedAttribute != null ) {
-						if ( attribute != null && !MappingModelHelper.isCompatibleModelPart( attribute, subDefinedAttribute ) ) {
-							throw new PathException(
-									String.format(
-											Locale.ROOT,
-											"Could not resolve attribute '%s' of '%s' due to the attribute being declared in multiple subtypes '%s' and '%s'",
-											name,
-											getJavaType().getTypeName(),
-											attribute.asAttributeMapping().getDeclaringType()
-													.getJavaType().getTypeName(),
-											subDefinedAttribute.asAttributeMapping().getDeclaringType()
-													.getJavaType().getTypeName()
-									)
-							);
-						}
-						attribute = subDefinedAttribute;
+		else if ( treatTargetType != this ) {
+			if ( !treatTargetType.isTypeOrSuperType( this ) ) {
+				return null;
+			}
+			// Prefer attributes defined in the treat target type or its subtypes
+			final var treatTypeSubPart = treatTargetType.findSubTypesSubPart( name, null );
+			if ( treatTypeSubPart != null ) {
+				return treatTypeSubPart;
+			}
+			else {
+				// If not found, look in the treat target type's supertypes
+				EntityMappingType superType = treatTargetType.getSuperMappingType();
+				while ( superType != this ) {
+					final var superTypeSubPart = superType.findDeclaredAttributeMapping( name );
+					if ( superTypeSubPart != null ) {
+						return superTypeSubPart;
 					}
-				}
-				if ( attribute != null ) {
-					return attribute;
+					superType = superType.getSuperMappingType();
 				}
 			}
 		}
@@ -6273,6 +6266,29 @@ public abstract class AbstractEntityPersister
 		}
 	}
 
+	private ModelPart findSubPartInSubclassMappings(String name) {
+		ModelPart attribute = null;
+		if ( isNotEmpty( subclassMappingTypes ) ) {
+			for ( var subMappingType : subclassMappingTypes.values() ) {
+				final var subDefinedAttribute = subMappingType.findSubTypesSubPart( name, null );
+				if ( subDefinedAttribute != null ) {
+					if ( attribute != null && !isCompatibleModelPart( attribute, subDefinedAttribute ) ) {
+						throw new PathException( String.format(
+								Locale.ROOT,
+								"Could not resolve attribute '%s' of '%s' due to the attribute being declared in multiple subtypes '%s' and '%s'",
+								name,
+								getJavaType().getTypeName(),
+								attribute.asAttributeMapping().getDeclaringType().getJavaType().getTypeName(),
+								subDefinedAttribute.asAttributeMapping().getDeclaringType().getJavaType().getTypeName()
+						) );
+					}
+					attribute = subDefinedAttribute;
+				}
+			}
+		}
+		return attribute;
+	}
+
 	@Override
 	public ModelPart findSubTypesSubPart(String name, EntityMappingType treatTargetType) {
 		final AttributeMapping declaredAttribute = declaredAttributeMappings.get( name );
@@ -6280,15 +6296,7 @@ public abstract class AbstractEntityPersister
 			return declaredAttribute;
 		}
 		else {
-			if ( subclassMappingTypes != null && !subclassMappingTypes.isEmpty() ) {
-				for ( EntityMappingType subMappingType : subclassMappingTypes.values() ) {
-					final ModelPart subDefinedAttribute = subMappingType.findSubTypesSubPart( name, treatTargetType );
-					if ( subDefinedAttribute != null ) {
-						return subDefinedAttribute;
-					}
-				}
-			}
-			return null;
+			return findSubPartInSubclassMappings( name );
 		}
 	}
 
@@ -6354,7 +6362,7 @@ public abstract class AbstractEntityPersister
 	}
 
 	@Override
-	public Fetchable getFetchable(int position) {
+	public AttributeMapping getFetchable(int position) {
 		return getStaticFetchableList().get( position );
 	}
 

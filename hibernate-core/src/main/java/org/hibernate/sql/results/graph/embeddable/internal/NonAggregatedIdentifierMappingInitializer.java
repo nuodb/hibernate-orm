@@ -307,6 +307,10 @@ public class NonAggregatedIdentifierMappingInitializer extends AbstractInitializ
 			data.setState( State.MISSING );
 			data.setInstance( null );
 		}
+		else if ( hasIdClass ) {
+			resolveKey( data );
+			resolveInstance( data );
+		}
 		else {
 			data.setState( State.INITIALIZED );
 			data.setInstance( instance );
@@ -324,7 +328,7 @@ public class NonAggregatedIdentifierMappingInitializer extends AbstractInitializ
 		for ( int i = 0; i < subInitializersForResolveFromInitialized.length; i++ ) {
 			final Initializer<InitializerData> initializer = subInitializersForResolveFromInitialized[i];
 			if ( initializer != null ) {
-				final Object subInstance = virtualIdEmbeddable.getValue( instance, i );
+				final Object subInstance = representationEmbeddable.getValue( instance, i );
 				if ( subInstance == LazyPropertyInitializer.UNFETCHED_PROPERTY ) {
 					// Go through the normal initializer process
 					initializer.resolveKey( rowProcessingState );

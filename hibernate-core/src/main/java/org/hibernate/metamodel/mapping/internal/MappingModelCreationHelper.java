@@ -893,7 +893,8 @@ public class MappingModelCreationHelper {
 				return interpretNestedToOneKeyDescriptor(
 						referencedEntityDescriptor,
 						referencedPropertyName,
-						attributeMapping
+						attributeMapping,
+						creationProcess
 				);
 			}
 
@@ -921,6 +922,7 @@ public class MappingModelCreationHelper {
 						creationProcess
 				);
 				attributeMapping.setForeignKeyDescriptor( embeddedForeignKeyDescriptor );
+				attributeMapping.setupCircularFetchModelPart( creationProcess );
 			}
 			else if ( modelPart == null ) {
 				throw new IllegalArgumentException( "Unable to find attribute " + bootProperty.getPersistentClass()
@@ -970,6 +972,7 @@ public class MappingModelCreationHelper {
 						( (PropertyBasedMapping) simpleFkTarget ).getPropertyAccess()
 				);
 			}
+			final SelectablePath parentSelectablePath = getSelectablePath( attributeMapping.getDeclaringType() );
 			final SelectableMapping keySelectableMapping;
 			int i = 0;
 			final Value value = bootProperty.getValue();
@@ -977,6 +980,7 @@ public class MappingModelCreationHelper {
 				keySelectableMapping = SelectableMappingImpl.from(
 						tableExpression,
 						columnIterator.next(),
+						parentSelectablePath,
 						simpleFkTarget.getJdbcMapping(),
 						creationProcess.getCreationContext().getTypeConfiguration(),
 						value.isColumnInsertable( i ),
@@ -993,6 +997,7 @@ public class MappingModelCreationHelper {
 				keySelectableMapping = SelectableMappingImpl.from(
 						tableExpression,
 						table.getPrimaryKey().getColumn( 0 ),
+						parentSelectablePath,
 						simpleFkTarget.getJdbcMapping(),
 						creationProcess.getCreationContext().getTypeConfiguration(),
 						value.isColumnInsertable( 0 ),
@@ -1014,6 +1019,7 @@ public class MappingModelCreationHelper {
 					swapDirection
 			);
 			attributeMapping.setForeignKeyDescriptor( foreignKeyDescriptor );
+			attributeMapping.setupCircularFetchModelPart( creationProcess );
 			creationProcess.registerForeignKey( attributeMapping, foreignKeyDescriptor );
 		}
 		else if ( fkTarget instanceof EmbeddableValuedModelPart ) {
@@ -1030,6 +1036,7 @@ public class MappingModelCreationHelper {
 					creationProcess
 			);
 			attributeMapping.setForeignKeyDescriptor( embeddedForeignKeyDescriptor );
+			attributeMapping.setupCircularFetchModelPart( creationProcess );
 			creationProcess.registerForeignKey( attributeMapping, embeddedForeignKeyDescriptor );
 		}
 		else {
@@ -1050,13 +1057,15 @@ public class MappingModelCreationHelper {
 	 * @param referencedEntityDescriptor The entity which contains the inverse property
 	 * @param referencedPropertyName The inverse property name path
 	 * @param attributeMapping The attribute for which we try to set the foreign key
+	 * @param creationProcess The creation process
 	 * @return true if the foreign key is actually set
 	 */
 	private static boolean interpretNestedToOneKeyDescriptor(
 			EntityPersister referencedEntityDescriptor,
 			String referencedPropertyName,
-			ToOneAttributeMapping attributeMapping) {
-		String[] propertyPath = StringHelper.split( ".", referencedPropertyName );
+			ToOneAttributeMapping attributeMapping,
+			MappingModelCreationProcess creationProcess) {
+		final String[] propertyPath = StringHelper.split( ".", referencedPropertyName );
 		EmbeddableValuedModelPart lastEmbeddableModelPart = null;
 
 		for ( int i = 0; i < propertyPath.length; i++ ) {
@@ -1081,6 +1090,7 @@ public class MappingModelCreationHelper {
 				}
 
 				attributeMapping.setForeignKeyDescriptor( foreignKeyDescriptor );
+				attributeMapping.setupCircularFetchModelPart( creationProcess );
 				return true;
 			}
 			if ( modelPart instanceof EmbeddableValuedModelPart ) {
@@ -1129,6 +1139,7 @@ public class MappingModelCreationHelper {
 			boolean[] updateable,
 			Dialect dialect,
 			MappingModelCreationProcess creationProcess) {
+		final SelectablePath parentSelectablePath = getSelectablePath( keyDeclaringType );
 		final boolean hasConstraint;
 		final SelectableMappings keySelectableMappings;
 		if ( bootValueMapping instanceof Collection ) {
@@ -1142,6 +1153,7 @@ public class MappingModelCreationHelper {
 					keyTableExpression,
 					collectionBootValueMapping.getKey(),
 					getPropertyOrder( bootValueMapping, creationProcess ),
+					parentSelectablePath,
 					creationProcess.getCreationContext().getMetadata(),
 					creationProcess.getCreationContext().getTypeConfiguration(),
 					insertable,
@@ -1167,6 +1179,7 @@ public class MappingModelCreationHelper {
 					keyTableExpression,
 					bootValueMapping,
 					getPropertyOrder( bootValueMapping, creationProcess ),
+					parentSelectablePath,
 					creationProcess.getCreationContext().getMetadata(),
 					creationProcess.getCreationContext().getTypeConfiguration(),
 					insertable,
@@ -1212,6 +1225,15 @@ public class MappingModelCreationHelper {
 					creationProcess
 			);
 		}
+	}
+
+	public static @Nullable SelectablePath getSelectablePath(ManagedMappingType type) {
+		if ( type instanceof EmbeddableMappingType ) {
+			final EmbeddableMappingType embeddableType = (EmbeddableMappingType) type;
+			return embeddableType.getAggregateMapping() != null
+					? embeddableType.getAggregateMapping().getSelectablePath() : null;
+		}
+		return null;
 	}
 
 	public static int[] getPropertyOrder(Value bootValueMapping, MappingModelCreationProcess creationProcess) {

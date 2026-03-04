@@ -81,16 +81,26 @@ public class SQLQueryParser {
 			final char ch = sqlQuery.charAt( index );
 			switch (ch) {
 				case '\'':
-					if (!doubleQuoted && !escaped) {
-						singleQuoted = !singleQuoted;
+					if (escaped) {
+						token.append(ch);
 					}
-					result.append(ch);
+					else {
+						if (!doubleQuoted) {
+							singleQuoted = !singleQuoted;
+						}
+						result.append(ch);
+					}
 					break;
 				case '"':
-					if (!singleQuoted && !escaped) {
-						doubleQuoted = !doubleQuoted;
+					if (escaped) {
+						token.append(ch);
 					}
-					result.append(ch);
+					else {
+						if ( !singleQuoted ) {
+							doubleQuoted = !doubleQuoted;
+						}
+						result.append( ch );
+					}
 					break;
 				case '{':
 					if (!singleQuoted && !doubleQuoted) {
@@ -216,7 +226,7 @@ public class SQLQueryParser {
 				}
 				aliasesFound++;
 				return collectionPersister.selectFragment( aliasName, collectionSuffix )
-						+ ", " + resolveProperties( aliasName, propertyName );
+					+ ", " + resolveProperties( aliasName, propertyName );
 			case "element.*":
 				return resolveProperties( aliasName, "*" );
 			default:
@@ -266,7 +276,7 @@ public class SQLQueryParser {
 			// TODO: better error message since we actually support composites if names are explicitly listed
 			throw new QueryException(
 					"SQL queries only support properties mapped to a single column - property [" +
-							propertyName + "] is mapped to " + columnAliases.length + " columns.",
+					propertyName + "] is mapped to " + columnAliases.length + " columns.",
 					originalQueryString
 			);
 		}

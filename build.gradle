@@ -36,8 +36,6 @@ plugins {
 	id 'org.checkerframework' version '0.6.40'
 	id 'org.hibernate.orm.build.jdks'
 
-	id 'io.github.gradle-nexus.publish-plugin' version '1.1.0'
-
 	id 'idea'
 	id 'org.jetbrains.gradle.plugin.idea-ext' version '1.0'
 	id 'eclipse'
@@ -78,29 +76,10 @@ ext.nuodbDatabaseVersion = checker.nuodbDatabaseVersion;
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Release Task
 
-tasks.register('release') {
-	description = "The task performed when we are performing a release build.  Relies on " +
-			"the fact that subprojects will appropriately define a release task " +
-			"themselves if they have any release-related activities to perform"
-
-	doFirst {
-		def javaVersionsInUse = jdkVersions.allVersions
-		if (javaVersionsInUse != [JavaLanguageVersion.of(11)].toSet()) {
-			throw new IllegalStateException("Please use JDK 11 to perform the release. Currently using: ${javaVersionsInUse}")
-		}
-	}
-}
-
 tasks.register('publish') {
 	description = "The task performed when we want to just publish maven artifacts.  Relies on " +
 			"the fact that subprojects will appropriately define a release task " +
 			"themselves if they have any publish-related activities to perform"
-}
-
-nexusPublishing {
-	repositories {
-		sonatype()
-	}
 }
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -133,6 +112,3 @@ idea {
 		name = "hibernate-orm"
 	}
 }
-
-
-

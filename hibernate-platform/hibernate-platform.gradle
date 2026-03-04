@@ -4,7 +4,6 @@ plugins {
 
 description = 'Gradle platform for Hibernate ORM'
 
-apply from: rootProject.file( 'gradle/releasable.gradle' )
 apply from: rootProject.file( "gradle/base-information.gradle" )
 apply from: rootProject.file( "gradle/publishing-pom.gradle" )
 
@@ -68,6 +67,17 @@ dependencies {
     }
 }
 
+task releasePrepare {
+	group "release-prepare"
+	description "See :release:releasePrepare for details."
+
+	dependsOn generateMetadataFileForPublishedArtifactsPublication
+	dependsOn generatePomFileForPublishedArtifactsPublication
+	// we depend on publishAllPublicationsToStagingRepository to make sure that the artifacts are "published" to a local staging directory
+	// used by JReleaser during the release process
+	dependsOn publishAllPublicationsToStagingRepository
+}
+
 publishing {
     publications {
         publishedArtifacts {
@@ -75,9 +85,3 @@ publishing {
         }
     }
 }
-
-project( ":release" ).getTasks().named( "publishReleaseArtifacts" ).configure {
-    dependsOn tasks.release
-}
-
-tasks.release.dependsOn tasks.publishToSonatype

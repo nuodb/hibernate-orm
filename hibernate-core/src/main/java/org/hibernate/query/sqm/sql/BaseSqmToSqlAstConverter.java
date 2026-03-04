@@ -128,6 +128,7 @@ import org.hibernate.query.sqm.internal.SqmMappingModelHelper;
 import org.hibernate.query.sqm.mutation.internal.SqmInsertStrategyHelper;
 import org.hibernate.query.sqm.produce.function.internal.PatternRenderer;
 import org.hibernate.query.sqm.spi.BaseSemanticQueryWalker;
+import org.hibernate.query.sqm.spi.SqmCreationHelper;
 import org.hibernate.query.sqm.sql.internal.AnyDiscriminatorPathInterpretation;
 import org.hibernate.query.sqm.sql.internal.AsWrappedExpression;
 import org.hibernate.query.sqm.sql.internal.BasicValuedPathInterpretation;
@@ -227,6 +228,7 @@ import org.hibernate.query.sqm.tree.from.SqmEntityJoin;
 import org.hibernate.query.sqm.tree.from.SqmFrom;
 import org.hibernate.query.sqm.tree.from.SqmFromClause;
 import org.hibernate.query.sqm.tree.from.SqmJoin;
+import org.hibernate.query.sqm.tree.from.SqmQualifiedJoin;
 import org.hibernate.query.sqm.tree.from.SqmRoot;
 import org.hibernate.query.sqm.tree.insert.SqmConflictClause;
 import org.hibernate.query.sqm.tree.insert.SqmConflictUpdateAction;
@@ -385,7 +387,6 @@ import org.hibernate.sql.results.graph.Fetch;
 import org.hibernate.sql.results.graph.FetchParent;
 import org.hibernate.sql.results.graph.Fetchable;
 import org.hibernate.sql.results.graph.FetchableContainer;
-import org.hibernate.sql.results.graph.collection.internal.EagerCollectionFetch;
 import org.hibernate.sql.results.graph.entity.EntityResultGraphNode;
 import org.hibernate.sql.results.graph.instantiation.internal.DynamicInstantiation;
 import org.hibernate.sql.results.graph.internal.ImmutableFetchList;
@@ -1926,11 +1927,14 @@ public abstract class BaseSqmToSqlAstConverter<T extends Statement> extends Base
 		final Collection<SqmCteStatement<?>> sqmCteStatements = consumer.getCteStatements();
 		cteContainer = new CteContainerImpl( cteContainer );
 		if ( !sqmCteStatements.isEmpty() ) {
+			final boolean originalDeduplicateSelectionItems = deduplicateSelectionItems;
+			deduplicateSelectionItems = false;
 			currentClauseStack.push( Clause.WITH );
 			for ( SqmCteStatement<?> sqmCteStatement : sqmCteStatements ) {
 				visitCteStatement( sqmCteStatement );
 			}
 			currentClauseStack.pop();
+			deduplicateSelectionItems = originalDeduplicateSelectionItems;
 			// Avoid leaking the processing state from CTEs to upper levels
 			lastPoppedFromClauseIndex = null;
 			lastPoppedProcessingState = null;
@@ -2681,7 +2685,12 @@ public abstract class BaseSqmToSqlAstConverter<T extends Statement> extends Base
 			// as roots anyway, so nothing to worry about
 
 			log.tracef( "Resolved SqmRoot [%s] to correlated TableGroup [%s]", sqmRoot, tableGroup );
-			consumeExplicitJoins( from, tableGroup );
+			if ( from instanceof SqmRoot<?> ) {
+				consumeJoins( (SqmRoot<?>) from, fromClauseIndex, tableGroup );
+			}
+			else {
+				consumeExplicitJoins( from, tableGroup );
+			}
 			return;
 		}
 		else {
@@ -3344,6 +3353,39 @@ public abstract class BaseSqmToSqlAstConverter<T extends Statement> extends Base
 				SqmMappingModelHelper.resolveExplicitTreatTarget( sqmJoin, this )
 		);
 
+		final List<SqmFrom<?, ?>> sqmTreats = sqmJoin.getSqmTreats();
+		final SqmPredicate joinPredicate;
+		final SqmPredicate[] treatPredicates;
+		final boolean hasPredicate;
+		if ( !sqmTreats.isEmpty() ) {
+			if ( sqmTreats.size() == 1 ) {
+				// If there is only a single treat, combine the predicates just as they are
+				joinPredicate = SqmCreationHelper.combinePredicates(
+						sqmJoin.getJoinPredicate(),
+						( (SqmQualifiedJoin<?, ?>) sqmTreats.get( 0 ) ).getJoinPredicate()
+				);
+				treatPredicates = null;
+				hasPredicate = joinPredicate != null;
+			}
+			else {
+				// When there are multiple predicates, we have to apply type filters
+				joinPredicate = sqmJoin.getJoinPredicate();
+				treatPredicates = new SqmPredicate[sqmTreats.size()];
+				boolean hasTreatPredicate = false;
+				for ( int i = 0; i < sqmTreats.size(); i++ ) {
+					final var p = ( (SqmQualifiedJoin<?, ?>) sqmTreats.get( i ) ).getJoinPredicate();
+					treatPredicates[i] = p;
+					hasTreatPredicate = hasTreatPredicate || p != null;
+				}
+				hasPredicate = joinPredicate != null || hasTreatPredicate;
+			}
+		}
+		else {
+			joinPredicate = sqmJoin.getJoinPredicate();
+			treatPredicates = null;
+			hasPredicate = joinPredicate != null;
+		}
+
 		if ( pathSource instanceof PluralPersistentAttribute ) {
 			assert modelPart instanceof PluralAttributeMapping;
 
@@ -3360,7 +3402,7 @@ public abstract class BaseSqmToSqlAstConverter<T extends Statement> extends Base
 					null,
 					sqmJoinType.getCorrespondingSqlJoinType(),
 					sqmJoin.isFetched(),
-					sqmJoin.getJoinPredicate() != null,
+					hasPredicate,
 					this
 			);
 
@@ -3376,7 +3418,7 @@ public abstract class BaseSqmToSqlAstConverter<T extends Statement> extends Base
 					null,
 					sqmJoinType.getCorrespondingSqlJoinType(),
 					sqmJoin.isFetched(),
-					sqmJoin.getJoinPredicate() != null,
+					hasPredicate,
 					this
 			);
 
@@ -3385,7 +3427,7 @@ public abstract class BaseSqmToSqlAstConverter<T extends Statement> extends Base
 			// Since this is an explicit join, we force the initialization of a possible lazy table group
 			// to retain the cardinality, but only if this is a non-trivial attribute join.
 			// Left or inner singular attribute joins without a predicate can be safely optimized away
-			if ( sqmJoin.getJoinPredicate() != null || sqmJoinType != SqmJoinType.INNER && sqmJoinType != SqmJoinType.LEFT ) {
+			if ( hasPredicate || sqmJoinType != SqmJoinType.INNER && sqmJoinType != SqmJoinType.LEFT ) {
 				joinedTableGroup.getPrimaryTableReference();
 			}
 		}
@@ -3422,14 +3464,26 @@ public abstract class BaseSqmToSqlAstConverter<T extends Statement> extends Base
 		final TableGroupJoin joinForPredicate;
 
 		// add any additional join restrictions
-		if ( sqmJoin.getJoinPredicate() != null ) {
+		if ( hasPredicate ) {
 			if ( sqmJoin.isFetched() ) {
 				QueryLogging.QUERY_MESSAGE_LOGGER.debugf( "Join fetch [%s] is restricted", sqmJoinNavigablePath );
 			}
 
 			final SqmJoin<?, ?> oldJoin = currentlyProcessingJoin;
 			currentlyProcessingJoin = sqmJoin;
-			final Predicate predicate = visitNestedTopLevelPredicate( sqmJoin.getJoinPredicate() );
+			Predicate predicate = joinPredicate == null ? null : visitNestedTopLevelPredicate( joinPredicate );
+			if ( treatPredicates != null ) {
+				final Junction orPredicate = new Junction( Junction.Nature.DISJUNCTION );
+				for ( int i = 0; i < treatPredicates.length; i++ ) {
+					final EntityDomainType<?> treatType =
+							(EntityDomainType<?>) ( (SqmTreatedPath<?, ?>) sqmTreats.get( i ) ).getTreatTarget();
+					orPredicate.add( combinePredicates(
+							createTreatTypeRestriction( sqmJoin, treatType ),
+							treatPredicates[i] == null ? null : visitNestedTopLevelPredicate( treatPredicates[i] )
+					) );
+				}
+				predicate = predicate != null ? combinePredicates( predicate, orPredicate ) : orPredicate;
+			}
 			joinForPredicate = TableGroupJoinHelper.determineJoinForPredicateApply( joinedTableGroupJoin );
 			// If translating the join predicate didn't initialize the table group,
 			// we can safely apply it on the collection table group instead
@@ -5886,43 +5940,11 @@ public abstract class BaseSqmToSqlAstConverter<T extends Statement> extends Base
 
 		final QueryParameterImplementor<?> queryParameter = domainParameterXref.getQueryParameter( sqmParameter );
 		final QueryParameterBinding binding = domainParameterBindings.getBinding( queryParameter );
-		if ( binding.setType( valueMapping ) ) {
-			replaceJdbcParametersType(
-					sqmParameter,
-					domainParameterXref.getSqmParameters( queryParameter ),
-					valueMapping
-			);
-		}
+		binding.setType( valueMapping );
 		return new SqmParameterInterpretation(
 				jdbcParametersForSqm,
 				valueMapping
 		);
-	}
-
-	private void replaceJdbcParametersType(
-			SqmParameter<?> sourceSqmParameter,
-			List<SqmParameter<?>> sqmParameters,
-			MappingModelExpressible<?> valueMapping) {
-		final JdbcMapping jdbcMapping = valueMapping.getSingleJdbcMapping();
-		for ( SqmParameter<?> sqmParameter : sqmParameters ) {
-			if ( sqmParameter == sourceSqmParameter ) {
-				continue;
-			}
-			sqmParameterMappingModelTypes.put( sqmParameter, valueMapping );
-			final List<List<JdbcParameter>> jdbcParamsForSqmParameter = jdbcParamsBySqmParam.get( sqmParameter );
-			if ( jdbcParamsForSqmParameter != null ) {
-				for ( List<JdbcParameter> parameters : jdbcParamsForSqmParameter ) {
-					assert parameters.size() == 1;
-					final JdbcParameter jdbcParameter = parameters.get( 0 );
-					if ( ( (SqlExpressible) jdbcParameter ).getJdbcMapping() != jdbcMapping ) {
-						final JdbcParameter newJdbcParameter = new JdbcParameterImpl( jdbcMapping );
-						parameters.set( 0, newJdbcParameter );
-						jdbcParameters.getJdbcParameters().remove( jdbcParameter );
-						jdbcParameters.getJdbcParameters().add( newJdbcParameter );
-					}
-				}
-			}
-		}
 	}
 
 	protected Expression consumeSqmParameter(SqmParameter<?> sqmParameter) {
@@ -5969,7 +5991,7 @@ public abstract class BaseSqmToSqlAstConverter<T extends Statement> extends Base
 
 	private MappingModelExpressible<?> determineValueMapping(SqmExpression<?> sqmExpression, FromClauseIndex fromClauseIndex) {
 		if ( sqmExpression instanceof SqmParameter ) {
-			return determineValueMapping( (SqmParameter<?>) sqmExpression );
+			return determineValueMapping( getSqmParameter( sqmExpression ) );
 		}
 
 		if ( sqmExpression instanceof SqmPath ) {
@@ -7786,17 +7808,42 @@ public abstract class BaseSqmToSqlAstConverter<T extends Statement> extends Base
 							this
 					)
 			);
+			subQuerySpec.applyPredicate(
+					new ComparisonPredicate(
+							toSingleExpression( subQuerySpec.getSelectClause().getSqlSelections(), lhs ),
+							ComparisonOperator.EQUAL,
+							lhs
+					)
+			);
+			subQuerySpec.getSelectClause().getSqlSelections().clear();
+			subQuerySpec.getSelectClause().addSqlSelection(
+					new SqlSelectionImpl( new QueryLiteral<>( 1, basicType( Integer.class ) ) )
+			);
 		}
 		finally {
 			popProcessingStateStack();
 		}
 
-		return new InSubQueryPredicate(
-				lhs,
+		return new ExistsPredicate(
 				new SelectStatement( subQuerySpec ),
 				predicate.isNegated(),
 				getBooleanType()
 		);
+	}
+
+	private Expression toSingleExpression(List<SqlSelection> sqlSelections, Expression inferenceSource) {
+		assert !sqlSelections.isEmpty();
+
+		if ( sqlSelections.size() == 1 ) {
+			return sqlSelections.get( 0 ).getExpression();
+		}
+		else {
+			final var expressions = new ArrayList<Expression>( sqlSelections.size() );
+			for ( SqlSelection sqlSelection : sqlSelections ) {
+				expressions.add( sqlSelection.getExpression() );
+			}
+			return new SqlTuple( expressions, (MappingModelExpressible<?>) inferenceSource.getExpressionType() );
+		}
 	}
 
 	@Override
@@ -8200,13 +8247,14 @@ public abstract class BaseSqmToSqlAstConverter<T extends Statement> extends Base
 			JpaCriteriaParameter<?> jpaCriteriaParameter) {
 		assert jpaCriteriaParameter.allowsMultiValuedBinding();
 
-		final QueryParameterBinding<?> domainParamBinding = domainParameterBindings.getBinding( jpaCriteriaParameter );
+		final SqmJpaCriteriaParameterWrapper<?> sqmWrapper = jpaCriteriaParamResolutions.get( jpaCriteriaParameter );
+		final QueryParameterImplementor<?> domainParam = domainParameterXref.getQueryParameter( sqmWrapper );
+		final QueryParameterBinding<?> domainParamBinding = domainParameterBindings.getBinding( domainParam );
 		if ( !domainParamBinding.isMultiValued() ) {
 			return null;
 		}
-		final SqmJpaCriteriaParameterWrapper<?> sqmWrapper = jpaCriteriaParamResolutions.get( jpaCriteriaParameter );
 
-		return processInSingleParameter( sqmPredicate, sqmWrapper, jpaCriteriaParameter, domainParamBinding );
+		return processInSingleParameter( sqmPredicate, sqmWrapper, domainParam, domainParamBinding );
 	}
 
 	@SuppressWarnings( "rawtypes" )
@@ -8494,6 +8542,16 @@ public abstract class BaseSqmToSqlAstConverter<T extends Statement> extends Base
 							}
 							else {
 								tableGroup = compatibleTableGroup;
+
+								if ( joinProducer instanceof PluralAttributeMapping ) {
+									final PluralAttributeMapping attributeMapping = (PluralAttributeMapping) joinProducer;
+									if ( attributeMapping.getOrderByFragment() != null ) {
+										applyOrdering( tableGroup, attributeMapping.getOrderByFragment() );
+									}
+									if ( attributeMapping.getManyToManyOrderByFragment() != null ) {
+										applyOrdering( tableGroup, attributeMapping.getManyToManyOrderByFragment() );
+									}
+								}
 							}
 
 							// and return the joined group

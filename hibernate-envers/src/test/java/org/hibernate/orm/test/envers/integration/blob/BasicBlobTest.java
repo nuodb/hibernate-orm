@@ -20,6 +20,7 @@ import org.junit.Test;
 
 import java.io.BufferedInputStream;
 import java.io.InputStream;
+import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Blob;
@@ -40,9 +41,9 @@ public class BasicBlobTest extends BaseEnversJPAFunctionalTestCase {
 
 	@Test
 	@Priority(10)
-	public void testGenerateProxyNoStream() {
+	public void testGenerateProxyNoStream() throws URISyntaxException {
 		final Path path = Path.of( Thread.currentThread().getContextClassLoader()
-				.getResource( "org/hibernate/orm/test/envers/integration/blob/blob.txt" ).getPath() );
+				.getResource( "org/hibernate/orm/test/envers/integration/blob/blob.txt" ).toURI() );
 		doInJPA( this::entityManagerFactory, entityManager -> {
 			final Asset asset = new Asset();
 			asset.setFileName( "blob.txt" );
@@ -84,11 +85,12 @@ public class BasicBlobTest extends BaseEnversJPAFunctionalTestCase {
 			comment = "The driver closes the stream, so it cannot be reused by envers")
 	@SkipForDialect(value = SybaseDialect.class,
 			comment = "The driver closes the stream, so it cannot be reused by envers")
-	public void testGenerateProxyStream() {
+	public void testGenerateProxyStream() throws URISyntaxException {
 		final Path path = Path.of( Thread.currentThread().getContextClassLoader()
-				.getResource( "org/hibernate/orm/test/envers/integration/blob/blob.txt" ).getPath() );
+				.getResource( "org/hibernate/orm/test/envers/integration/blob/blob.txt" ).toURI() );
 
 		try (final InputStream stream = new BufferedInputStream( Files.newInputStream( path ) )) {
+			final long length = Files.size( path );
 			doInJPA( this::entityManagerFactory, entityManager -> {
 				final Asset asset = new Asset();
 				asset.setFileName( "blob.txt" );
@@ -108,7 +110,7 @@ public class BasicBlobTest extends BaseEnversJPAFunctionalTestCase {
 				// H2, MySQL, Oracle, SQL Server work this way.
 				//
 				//
-				Blob blob = BlobProxy.generateProxy( stream, 1431 );
+				Blob blob = BlobProxy.generateProxy( stream, length );
 
 				asset.setData( blob );
 				entityManager.persist( asset );

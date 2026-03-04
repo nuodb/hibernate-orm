@@ -266,26 +266,31 @@ public class ComponentPropertyHolder extends AbstractPropertyHolder {
 
 	@Override
 	public void addProperty(Property property, AnnotatedColumns columns, XClass declaringClass) {
-		//Ejb3Column.checkPropertyConsistency( ); //already called earlier
+		//AnnotatedColumns.checkPropertyConsistency( ); //already called earlier
 		// Check table matches between the component and the columns
 		// if not, change the component table if no properties are set
 		// if a property is set already the core cannot support that
-		if ( columns != null ) {
-			final Table table = columns.getTable();
-			if ( !table.equals( getTable() ) ) {
-				if ( component.getPropertySpan() == 0 ) {
-					component.setTable( table );
-				}
-				else {
-					throw new AnnotationException(
-							"Embeddable class '" + component.getComponentClassName()
-									+ "' has properties mapped to two different tables"
-									+ " (all properties of the embeddable class must map to the same table)"
-					);
-				}
+		assert columns == null || property.getValue().getTable() == columns.getTable();
+		setTable( property.getValue().getTable() );
+		addProperty( property, declaringClass );
+	}
+
+	private void setTable(Table table) {
+		if ( !table.equals( getTable() ) ) {
+			if ( component.getPropertySpan() == 0 ) {
+				component.setTable( table );
+			}
+			else {
+				throw new AnnotationException(
+						"Embeddable class '" + component.getComponentClassName()
+						+ "' has properties mapped to two different tables"
+						+ " (all properties of the embeddable class must map to the same table)"
+				);
+			}
+			if ( parent instanceof ComponentPropertyHolder ) {
+				( (ComponentPropertyHolder) parent ).setTable( table );
 			}
 		}
-		addProperty( property, declaringClass );
 	}
 
 	@Override
@@ -328,6 +333,16 @@ public class ComponentPropertyHolder extends AbstractPropertyHolder {
 			}
 		}
 		component.addProperty( prop, declaringClass );
+	}
+
+	@Override
+	public void movePropertyToJoin(Property prop, Join join, XClass declaringClass) {
+		// or maybe only throw if component.getTable() != join.getTable()
+		throw new AnnotationException(
+				"Embeddable class '" + component.getComponentClassName()
+				+ "' has an unowned @OneToOne property " + prop.getName()
+				+ "mapped to a join table which is unsupported"
+		);
 	}
 
 	@Override

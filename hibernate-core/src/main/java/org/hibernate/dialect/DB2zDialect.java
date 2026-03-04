@@ -215,13 +215,9 @@ public class DB2zDialect extends DB2Dialect {
 		};
 	}
 
-	// I speculate that this is a correct implementation of rowids for DB2 for z/OS,
-	// just on the basis of the DB2 docs, but I currently have no way to test it
-	// Note that the implementation inherited from DB2Dialect for LUW will not work!
-
 	@Override
 	public String rowId(String rowId) {
-		return rowId == null || rowId.isEmpty() ? "rowid_" : rowId;
+		return rowId;
 	}
 
 	@Override
@@ -232,5 +228,11 @@ public class DB2zDialect extends DB2Dialect {
 	@Override
 	public String getRowIdColumnString(String rowId) {
 		return rowId( rowId ) + " rowid not null generated always";
+	}
+
+	@Override
+	public boolean supportsValuesList() {
+		// DB2 z/OS has a VALUES statement, but that doesn't support multiple values
+		return false;
 	}
 }
