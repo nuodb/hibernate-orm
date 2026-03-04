@@ -20,102 +20,12 @@ buildscript {
     }
 }
 
-// These were previously set in build.gradle,but seems that's not unnecessary with profiles
+// This should be set in build.gradle, let's just check ...
 if (!properties.containsKey("nuodbJdbcJarVersion") || ext.nuodbJdbcJarVersion == null) {
-    ext.nuodbJdbcJarVersion = "24.2.0";  // NuoDB's JDBC JAR version
+    throw new GradleException("matrix.gradle: NuoDB JDBC JAR not available")
 }
 
-if (!properties.containsKey("nuodbHibernateJarVersion") || ext.nuodbHibernateJarVersion == null) {
-    var dialectVersion = System.env['DIALECT_VERSION'] // NuoDB's Hibernate JAR version
+println "matrix.gradle: Build is using NuoDB Dialect  V${nuodbHibernateJarVersion}"
 
-    if (dialectVersion == null) {
-        println("build.gradle: DIALECT_VERSION environment variable should be set to 23.0.0-hib6 or later")
-        throw new GradleException("DIALECT_VERSION environment variable should be set to 23.0.0-hib6 or later")
-    }
-    else if (!dialectVersion.endsWith("-hib6")) {
-        dialectVersion = "${dialectVersion}-hib6"
-    }
-
-    ext.nuodbHibernateJarVersion = dialectVersion;
- }
-
-println "matrix.gradle: Matrix build using NuoDB JDBC JAR V${nuodbJdbcJarVersion}"
-println "matrix.gradle: Matrix build using NuoDB Dialect  V${nuodbHibernateJarVersion}"
-
+// Main purpose of this file is to set the JDBC JAR for NuoDB
 jdbcDependency "com.nuodb.jdbc:nuodb-jdbc:${nuodbJdbcJarVersion}"
-
-/* dependencies {
-    implementation    "com.nuodb.jdbc:nuodb-jdbc:${nuodbJdbcJarVersion}"
-    implementation    "com.nuodb.hibernate:nuodb-hibernate:${nuodbHibernateJarVersion}"
-} */
-
-// Check NuoDB DataSource and Dialect are on the classpath and can connect to the database 
-NuoDBDependencies.isAvailable("${projectDir}/databases/nuodb/resources/hibernate.properties", "${nuodbHibernateJarVersion}")
-
-// Save the NuoDB version
-ext.nuodbDatabaseVersion = NuoDBDependencies.nuodbDatabaseVersion;
-
-
-/**
- * Check the NuoDB dependencies are on the classpath and that the test database is running
- * on localhost.
- */
-public class NuoDBDependencies {
-    public static int nuodbDatabaseVersion; // major version;
-
-    /**
-     * Is the test database available?  Is NuoDBDialect on the classpath?
-     */
-    public static boolean isAvailable(String hibernatePropertiesFile, String expectedJarVersion) {
-        com.nuodb.jdbc.DataSource dataSource = null;
-        java.sql.Connection conn = null;
-
-        try {
-            java.util.Properties props = new java.util.Properties();
-            props.load(new java.io.FileReader(hibernatePropertiesFile));
-
-            // Display the properties being used
-            System.out.println('Testing using these properties:');
-            Set entries = props.entrySet();
-            
-            for (Map.Entry e: entries) {
-                if (((String) e.getKey()).startsWith("hibernate.connection"))
-                    System.out.println("    " + e.getKey() + "=" + e.getValue());
-            }
-
-            // Setup our data source
-            dataSource = new com.nuodb.jdbc.DataSource();
-            dataSource.setUrl(props.getProperty("hibernate.connection.url").replace('.hib', ''));
-            dataSource.setUsername(props.getProperty("hibernate.connection.username"));
-            dataSource.setPassword(props.getProperty("hibernate.connection.password"));
-
-            // Check we can connect (database is running) and get the NuoDB version
-            conn = dataSource.getConnection();
-            java.sql.DatabaseMetaData meta = conn.getMetaData();
-            var majorVersion = meta.getDatabaseMajorVersion();
-            var minorVersion = meta.getDatabaseMinorVersion();
-            System.out.println(">> NuoDB version ${majorVersion}.${minorVersion} is available");
-            this.nuodbDatabaseVersion = majorVersion;
-        } catch (Exception e) {
-            System.err.println(">> Failed attempting to check for database: " + e);
-            throw new GradleException("Unable to access database for tests: ${e.localizedMessage}");
-        } finally {
-            if (conn != null) conn.close();
-            if (dataSource != null) dataSource.close(); 
-        }
-        
-        // Sanity check for Hibernate jar
-        com.nuodb.hibernate.NuoDBDialect dialect = new com.nuodb.hibernate.NuoDBDialect();
-
-        if (dialect != null)
-            System.out.println(">> NuoDB Dialect ${dialect.getClass()} available");
-
-        var versionInfo = new com.nuodb.hibernate.JarVersionInfo();
-        var jarVersion = versionInfo.version();
-
-        if (!jarVersion.equals(expectedJarVersion))
-            throw new RuntimeException("Jar version '${jarVersion}' does not match dependency version '${expectedJarVersion}'");
-
-        return true;
-    }
-}

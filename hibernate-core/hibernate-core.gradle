@@ -63,6 +63,15 @@ test {
         excludeTestsMatching 'org.hibernate.orm.test.hql.ASTParserLoadingTest.testEJBQLFunctions' // Cannot compare INTEGER to OBJECT?
 
         // These work when invoked manually, but not as part of test suite
+        excludeTestsMatching 'org.hibernate.orm.test.mapping.mappedBy.IsNullAndMappedByTest.testDelete'
+        excludeTestsMatching 'org.hibernate.orm.test.mapping.mappedBy.IsNullAndMappedByTest.testHqlUpdate'
+        excludeTestsMatching 'org.hibernate.orm.test.mapping.mappedBy.IsNullAndMappedByTest.testWhereClause'
+        excludeTestsMatching 'org.hibernate.orm.test.notfound.IsNullAndNotFoundTest.testDelete'
+        excludeTestsMatching 'org.hibernate.orm.test.mapping.mappedBy.IsNullAndMappedByTest.testHqlUpdate'
+        excludeTestsMatching 'org.hibernate.orm.test.notfound.IsNullAndNotFoundTest.'
+        excludeTestsMatching 'org.hibernate.orm.test.notfound.IsNullAndNotFoundTest.testDeleteAdditionalPredicate'
+        excludeTestsMatching 'org.hibernate.orm.test.notfound.MutationQueriesAndNotFoundActionTest'
+
         // includeTestsMatching 'DynamicFilterTest'
         // includeTestsMatching 'org.hibernate.orm.test.annotations.SecuredBindingTest.testConfigurationMethods'
         // includeTestsMatching 'org.hibernate.orm.test.bootstrap.jpa.PersistenceUnitInfoTests.class'
@@ -161,7 +170,24 @@ test {
         // Tests to skip due to known NuoDB limitations
         // --------------------------------------------
 
-        if (nuodbDatabaseVersion < 7) {
+        println "hibernate-core.gradle: NuoDB JDBC JAR version is V${nuodbJdbcJarVersion}"
+
+         // Does the NuoDB JDBC JAR support NClob, NString ... ?
+        SimpleDatabaseVersion jdbcJarVersion = new SimpleDatabaseVersion(nuodbJdbcJarVersion);
+
+        if (jdbcJarVersion.isBefore('24.2.2')) {  // Supported from 24.2.2
+           println 'hibernate-core.gradle: Excluding tests of Nationalized columns'
+            excludeTestsMatching 'NClobTest.test'
+            excludeTestsMatching 'org.hibernate.orm.test.type.LobUnfetchedPropertyTest.testNClob'
+        } else {
+            println 'hibernate-core.gradle: Including tests of Nationalized columns'
+        }
+
+        println "hibernate-core.gradle: NuoDB Database version is V${nuodbDatabaseVersion}" 
+
+        if (nuodbDatabaseVersion.isBefore(7,0,0)) {
+            println 'hibernate-core.gradle: Excluding tests using NuoDB 7 features'
+
             // FULL OUTER JOIN not supported until NuoDB 7
             excludeTestsMatching 'EntityJoinWithJoinedInheritanceTest.testFullJoin'
             excludeTestsMatching 'EntityJoinWithSingleTableInheritanceTest.testFullJoin'
@@ -180,7 +206,86 @@ test {
             // Not until NuoDB 7 for var_samp() et al
             excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testStatisticalFunctions'
             excludeTestsMatching 'org.hibernate.orm.test.hql.HQLTest.test_var_function_example'
+
+            excludeTestsMatching 'org.hibernate.orm.test.query.criteria.CriteriaWindowFunctionTest.testRank'
+
+            excludeTestsMatching 'org.hibernate.orm.test.query.hql.WindowFunctionTest.testRank' // rank()
+            excludeTestsMatching 'org.hibernate.orm.test.query.hql.WindowFunctionTest.testOrderByAndAlias' // dense_rank()
+
+            excludeTestsMatching 'org.hibernate.orm.test.jpa.query.CorrelationCteDerivedRootTest.testDerivedRoot'
+		    excludeTestsMatching 'org.hibernate.orm.test.query.hql.InsertSelectTests.testInsertSelectDistinct'
+
+            // CASE ... IN (...) weirdness
+            excludeTestsMatching 'org.hibernate.orm.test.hql.HQLTest.test_hql_in_predicate_example_1'
+            excludeTestsMatching 'org.hibernate.orm.test.jpa.ql.TreatKeywordTest.testFilteringJoinedSubclasses'
+        } else {
+            println 'hibernate-core.gradle: Running tests using NuoDB 7 features'
         }
+
+        // No support for first_value(), nth_value(), percent_rank(), cume_dist() or empty order()
+        excludeTestsMatching 'org.hibernate.orm.test.query.criteria.CriteriaTimeoutTest.testCreateMutationQueryCriteriaInsertSelect' // over()
+		excludeTestsMatching 'CriteriaWindowFunctionTest.testFrame'
+		excludeTestsMatching 'CriteriaWindowFunctionTest.testFirstValue'
+		excludeTestsMatching 'CriteriaWindowFunctionTest.testNthValue'
+		excludeTestsMatching 'CriteriaWindowFunctionTest.testReusableWindow'
+		excludeTestsMatching 'CriteriaWindowFunctionTest.testRowNumberWithoutOrder' // over()
+        excludeTestsMatching 'org.hibernate.orm.test.query.hql.WindowFunctionTest.testFrame'
+        excludeTestsMatching 'org.hibernate.orm.test.query.hql.WindowFunctionTest.testRowNumberWithoutOrder' // over()
+
+        // Functions or behaviours NuoDB doesn't support
+        excludeTestsMatching 'NamedQueryCommentTest' // our query hints go after select/update not before
+		excludeTestsMatching 'NullPrecedenceTest.testNullPrecedence'  // NuoDB does not support NULL precedence
+        excludeTestsMatching 'HQLTest.test_hql_cte_materialized_example' // WITH (a, b) is illegal syntax
+        excludeTestsMatching 'HQLTest.test_hql_derived_join_example' // LEFT OUTER JOIN requires ON clause - use 6.6 emulation?
+		excludeTestsMatching 'SQLExceptionConversionTest.testIntegrityViolation'  // No integrity checking in NuoDB
+        excludeTestsMatching 'org.hibernate.orm.test.query.SubQueryInFrom*'  // Predicate 1 is not a boolean operation
+		excludeTestsMatching 'CteTests.testSubquery'  // emulation -> unsupported SQL construct
+		excludeTestsMatching 'org.hibernate.orm.test.join.OuterJoinTest.testJoinOrderWithRightJoinWithInnerImplicitJoins' // Dependent RIGHT OUTER JOIN
+        excludeTestsMatching 'org.hibernate.orm.test.temporal.TimePropertyTest'  // Can't use a DATE as a TIME
+
+        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testAggregateIndicesElementsWithPath' // NoReult No result found for query [select max(indices(eol.listOfNumbers)) from EntityOfLists eol] 
+        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testCastFunction' // NuoDB doesn't automatically truncate. No result found for query [select cast(e.theBoolean as String) from EntityOfBasics e] 
+        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testDurationArithmeticWithLiterals' // Expected: <PT120H> but was: <null> 
+        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testDurationSubtractionWithDatetimeLiterals' // Expected: <PT840H> but was: <null> 
+        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testDurationBy' // No result found for query [select e.theDuration from EntityOfBasics e] 
+        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testDurationLiterals' //  No result found for query [select e.theDuration from EntityOfBasics e] 
+        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testExtractFunctionWeek'  // WEEK not implemented
+        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testExtractFunctionWithAssertions' // IndexOutOfBounds Index 0 out of bounds for length 0 
+        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testHyperbolic' // No result found for query [select sinh(e.theDouble) from EntityOfBasics e] 
+        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testImplicitCollectionJoinInSelects' // Expected: (a collection containing <0> and a collection containing <1>)  but: a collection containing <0> 
+        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testImplicitCollectionJoinInWhere' // No result found for query [from EntityOfLists eol join eol.listOfOneToMany se where element(se).someLong=5] 
+        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testMathFunctions' // SQLGrammar exception executing SQL [select power(2.71828182845904523536028747135266249775724709369995E0,eob1_0.the_double),ln((eob1_0.the_double+1)),log(10,(eob1_0.the_double+2)) from EntityOfBasics eob1_0] [can't find function "LN"] [n/a] 
+        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testMaxindexMaxelement' // NoResult No result found for query [select maxindex(eol.listOfBasics) from EntityOfLists eol] 
+        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testMedian'  // median() not supported
+        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testOverlayFunction' // IndexOutOfBounds Index 0 out of bounds for length 0 
+
+        excludeTestsMatching 'org.hibernate.orm.test.query.criteria.CriteriaBuilderNonStandardFunctionsTest.testLog' // LOG() not supported
+
+        excludeTestsMatching 'org.hibernate.orm.test.query.hql.StandardFunctionTests.testLog' // ln() not implemented
+        excludeTestsMatching 'org.hibernate.orm.test.query.hql.StandardFunctionTests.testMathFunctions' // ln() not implemented
+        excludeTestsMatching 'org.hibernate.orm.test.query.hql.StandardFunctionTests.testExtractFunction' // WEEK not implemented
+		excludeTestsMatching 'org.hibernate.orm.test.query.hql.StandardFunctionTests.testExtractFunctionWithAssertions' // WEEK not implemented
+
+        // We do not support pooled sequences as Hibernate expects to use them, and the start and
+        // increment info is not available anyway
+		excludeTestsMatching 'SequenceInformationTest.test'
+        excludeTestsMatching 'org.hibernate.orm.test.schemaupdate.idbag.IdBagSequenceTest'
+
+        // Tests to check Hibernate resolver can find a dummy test Dialect, but we have hard-wired tests to use NuoDB
+        excludeTestsMatching 'org.hibernate.orm.test.dialect.resolver.DiscoveredDialectResolverTests'
+
+        // Sub-select alias with parameters "(SELECT ...) alias(a, b)" not supported
+        // Try to use 6.6 emulation?
+        excludeTestsMatching 'HQLTest.test_hql_derived_root_example' // Multi-valued alias d1_0(owner_id,payed) 
+		excludeTestsMatching 'CteTests.testBasic'
+		excludeTestsMatching 'CteTests.testBasicJoined'
+		excludeTestsMatching 'CteTests.testMaterialized'
+		excludeTestsMatching 'CteTests.testNested'
+		excludeTestsMatching 'FunctionsWithAnonymousTupleTest'
+		excludeTestsMatching 'org.hibernate.orm.test.hql.NestedSubqueryTest.testNestedHqlSubQueries*'
+		excludeTestsMatching 'CriteriaMultiselectGroupByAndOrderByTest.testSubqueryGroupBy'
+		excludeTestsMatching 'CriteriaMultiselectGroupByAndOrderByTest.testSubqueryGroupByAndOrderBy'
+		excludeTestsMatching 'CriteriaMultiselectGroupByAndOrderByTest.testSubqueryGroupByAndOrderByAndHaving'
 
         // sign() function in @Formula annotation is used as-is - the registered emulation is ignored
         excludeTestsMatching 'FormulaWithPartitionByTest'

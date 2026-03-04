@@ -1,0 +1,20 @@
+= About buildSrc Directory
+
+Added for NuoDB to enable environment checking at the start of a build.
+Without any checks the entire build will will run (takes about 10 minutes) and _then_ fail with an error.
+These checks happen right at the start.
+
+Contains 2 Groovy files in `src/main/groovy`.
+
+SimpleDatabaseVersion.groovy::
+Hibernate core is not available to the build script, so this is a partial copy of Hibernate's own `SimpleDatabaseVersion` for use by `hibernate-core.gradle` to determine if tests can run or not, depending on the NuoDB version of the `hibernate-orm` test database
+
+CheckNuoDBDatabaseAndVersion.groovy::
+Performs validation checks to ensure:
++
+. The version of the NuoDB Hibernate JAR specified by `DIALECT_VERSION` matches the current branch of this project.
+. Checks that the NuoDB Hibernate JAR exists in the Maven repository.
+. That the `hibernate_orm` database is available and can be connected to.
+
++
+Also extracts the version of the NuoDB database as a `SimpleDatabaseVersion` instance and makes it globally available (as an `ext` variable).

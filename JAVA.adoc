@@ -1,0 +1,28 @@
+:java-version: 8
+
+= Managing Java Versions
+
+There are several options for managing multiple JDKs on your development machine.
+
+* _Option 1:_ Use `sdkman`: https://sdkman.io which can also run on MS Windows (_recommended_).
+** `skdman` requires `git bash` or WSL on Windows.
+** There are many JDK builds available, the examples here use those from Zulu.
+*** To see available versions run `sdk list java | grep zulu`.
+*** To install Java {java-version} run `sdk install java {java-version}.xxx-zulu` (where `xxx` is the version of Java {java-version} shown in the list).
+*** Then run `sdk use java {java-version}.xxx` to make it current.
+
+* _Option 2:_ On Linux, the `update-alternatives` command may be used.
+See https://dev.to/thegroo/install-and-manage-multiple-java-versions-on-linux-using-alternatives-5e93 for details.
+
+* _Option 3:_ If running in Linux or MacOS, install `jenv` from https://github.com/jenv/jenv to manage your JVMs
+** There is a Windows version but I found it unreliable.
+** You will need to tell it which JDKs you already have installed.
+*** jenv does not install JDKs for you, you have to do it manually first then tell `jenv` it exists. `sdkman` is better in this regard.
+** There is a `.java-version` file in this project, telling `jenv` to use Java {java-version} or later.
+** If necessary, use `jenv` to switch to Java {java-version} or later.
+For example, to use `{java-version}.x.y`, run `jenv local {java-version}.x.y`.
+** This project includes a `.java-version` file that tells `jenv` to select JDK {java-version} if available.
+
+* _Option 4:_ If not using a Java package manager, ensure `JAVA_HOME` is set to point to your JDK {java-version} installation.
+
+Return to the xref:README.adoc["README"]

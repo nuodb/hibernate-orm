@@ -81,7 +81,7 @@ dependencyResolutionManagement {
             def jbossLoggingToolVersion = version "jbossLoggingTool", "3.0.1.Final"
 
             def agroalVersion = version "agroal", "2.0"
-            def c3poVersion = version"c3p0", "0.9.5.5"
+            def c3poVersion = version "c3p0", "0.9.5.5"
             def hikaricpVersion = version "hikaricp", "3.2.0"
             def proxoolVersion = version "proxool", "0.8.3"
             def viburVersion = version "vibur", "25.0"
@@ -124,7 +124,7 @@ dependencyResolutionManagement {
 
             library( "vibur", "org.vibur", "vibur-dbcp" ).versionRef( viburVersion )
 
-	    library( "ucp", "com.oracle.database.jdbc", "ucp11" ).versionRef( ucpVersion )
+	        library( "ucp", "com.oracle.database.jdbc", "ucp11" ).versionRef( ucpVersion )
 
             library( "ojdbc11", "com.oracle.database.jdbc", "ojdbc11" ).versionRef( ucpVersion )
 
