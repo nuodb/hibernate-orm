@@ -3695,12 +3695,19 @@ public class ASTParserLoadingTest {
 
 		hql = "from Animal a where mod(16, 4) = 4";
 		session.createQuery(hql).list();
+		
+		// NUODB: Start
+		if (!scope.getSessionFactory().getJdbcServices().getDialect().getClass().getName().contains("NuoDB")) {
+			hql = "from Animal a where bit_length(str(a.bodyWeight)) = 24";
+        	session.createQuery(hql).list();
+		}
+		else {
+			System.out.println("Skipping for NuoDB: " + hql);
+		}
+		// NUODB: End
 
-		hql = "from Animal a where bit_length(str(a.bodyWeight)) = 24";
-		session.createQuery(hql).list();
-
-		hql = "select bit_length(str(a.bodyWeight)) from Animal a";
-		session.createQuery(hql).list();
+        hql = "select bit_length(str(a.bodyWeight)) from Animal a";
+        session.createQuery(hql).list();
 
 		/*hql = "select object(a) from Animal a where CURRENT_DATE = :p1 or CURRENT_TIME = :p2 or CURRENT_TIMESTAMP = :p3";
 		session.createQuery(hql).list();*/

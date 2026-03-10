@@ -34,83 +34,56 @@ repositories {
 // --------------------------------------------------------------------- //
 test {
     filter {
+
+        // ---------------------------------------------------------------------
+        // Tests partly modified to work with NuoDB
+        // ---------------------------------------------------------------------
+        // org.hibernate.orm.test.query.hql.StandardFunctionTests // Exclide log()/ln()/
+
+        // org.hibernate.orm.test.hql.ASTParserLoadingTest.testEJBQLFunctions // Cannot compare INTEGER to OBJECT?
+        // - WARNING: Failing tests from this class leak connections and exhaust the pool, so all subsequent tests fail
+
         // ---------------------------------------------------------------------
         // Failing tests that need fixing?
         // ---------------------------------------------------------------------
-
-        // Undefined reference to DESCRIPTION
-        excludeTestsMatching 'org.hibernate.orm.test.hql.BulkManipulationTest'
-
-        // Illegal null in column HIB_SESS_ID - note these are in 2 different packages
-		excludeTestsMatching 'InsertSelectTests.simpleTest'
-		excludeTestsMatching 'InsertSelectTests.testInsertSelectDistinct'
-		excludeTestsMatching 'InsertSelectTests.testInsertSelectGroupBy'
-
-		excludeTestsMatching 'CteTests.testInSubquery' // Returns more than one row
-		excludeTestsMatching 'CteTests.testSubquery'  // emulation -> unsupported SQL construct
-		excludeTestsMatching 'CriteriaQualifiedJoinTest.testJoinLateral'   // emulation -> unsupported SQL construct
-		excludeTestsMatching 'HQLTest.test_hql_derived_join_example'  // emulation -> unsupported SQL construct -> on 1 and exists(...)
-        excludeTestsMatching 'org.hibernate.orm.test.query.SubQueryInFrom*'  // Predicate 1 is not a boolean operation
-
-        excludeTestsMatching 'FetchClausePaginationTest.testFetchWithTies'
-
-        excludeTestsMatching 'WindowFunctionTest.testFrame'
-        excludeTestsMatching 'WindowFunctionTest.testRowNumberWithoutOrder'
-		excludeTestsMatching 'WindowFunctionTest.testOrderByAndAlias'
-		excludeTestsMatching 'WindowFunctionTest.testRank'
-
-        // WARNING: Failing tests from this class leak connections and exhaust the pool, so all subsequent tests fail
-        excludeTestsMatching 'org.hibernate.orm.test.hql.ASTParserLoadingTest.testEJBQLFunctions' // Cannot compare INTEGER to OBJECT?
 
         // These work when invoked manually, but not as part of test suite
         excludeTestsMatching 'org.hibernate.orm.test.mapping.mappedBy.IsNullAndMappedByTest.testDelete'
         excludeTestsMatching 'org.hibernate.orm.test.mapping.mappedBy.IsNullAndMappedByTest.testHqlUpdate'
         excludeTestsMatching 'org.hibernate.orm.test.mapping.mappedBy.IsNullAndMappedByTest.testWhereClause'
-        excludeTestsMatching 'org.hibernate.orm.test.notfound.IsNullAndNotFoundTest.testDelete'
         excludeTestsMatching 'org.hibernate.orm.test.mapping.mappedBy.IsNullAndMappedByTest.testHqlUpdate'
-        excludeTestsMatching 'org.hibernate.orm.test.notfound.IsNullAndNotFoundTest.'
+        excludeTestsMatching 'org.hibernate.orm.test.notfound.IsNullAndNotFoundTest.testDelete'
+        excludeTestsMatching 'org.hibernate.orm.test.notfound.IsNullAndNotFoundTest.testHqlUpdate'
         excludeTestsMatching 'org.hibernate.orm.test.notfound.IsNullAndNotFoundTest.testDeleteAdditionalPredicate'
         excludeTestsMatching 'org.hibernate.orm.test.notfound.MutationQueriesAndNotFoundActionTest'
 
-        // includeTestsMatching 'DynamicFilterTest'
-        // includeTestsMatching 'org.hibernate.orm.test.annotations.SecuredBindingTest.testConfigurationMethods'
-        // includeTestsMatching 'org.hibernate.orm.test.bootstrap.jpa.PersistenceUnitInfoTests.class'
-        // includeTestsMatching 'org.hibernate.orm.test.bootstrap.jpa.PersistenceUnitOverridesTests.testIntegrationOverridesOfPersistenceXmlDataSource'
-        // includeTestsMatching 'org.hibernate.orm.test.bootstrap.jpa.PersistenceUnitOverridesTests.testPassingIntegrationJpaDataSourceOverrideForJtaDataSourceElement'
-        // includeTestsMatching 'org.hibernate.orm.test.bootstrap.jpa.PersistenceUnitOverridesTests.testPassingIntegrationJtaDataSourceOverrideForJpaJdbcSettings'
-        // includeTestsMatching 'org.hibernate.orm.test.multitenancy.ConfigurationValidationTest.testReleaseMode'
+        // When run manually,:"The root node [org.hibernate.orm.test.jpa.CriteriaUpdateAndDeleteWithJoinTest$Parent]
+        // does not allow join/fetch".  When run as part of the test suite, different errors:
+        // - Fails with Ambiguous reference to "CODE" - because it's missing table alias.
+        excludeTestsMatching 'org.hibernate.orm.test.jpa.CriteriaUpdateAndDeleteWithJoinTest.testUpdate'
+        // - Fails with assertion error
+        excludeTestsMatching 'org.hibernate.orm.test.jpa.CriteriaUpdateAndDeleteWithJoinTest.testDelete'
 
-        // includeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testAggregateIndicesElementsWithPath'
-        // includeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testColumnFunction'
+        // Undefined reference to DESCRIPTION during initialization, so no tests can actually run
+        excludeTestsMatching 'org.hibernate.orm.test.hql.BulkManipulationTest.*'
 
-        // Tests explicity look for CROSS JOIN in SQL, but work otherwise
-		excludeTestsMatching 'JpaCrossJoinTests.test2Roots'
-		excludeTestsMatching 'JpaCrossJoinTests.test2Roots2'
+        // Error: function requires an order by clause in the window specification
+		excludeTestsMatching 'org.hibernate.orm.test.query.criteria.InsertSelectTests.simpleTest'
+		excludeTestsMatching 'org.hibernate.orm.test.query.hql.InsertSelectTests.testInsertSelectGroupBy'
 
-        // These all fail, not sure why yet
-        excludeTestsMatching 'org.hibernate.orm.test.query.hql.**ArrayTest.class'
-        excludeTestsMatching 'org.hibernate.orm.test.type.EnumSetTest.class'
+        // Returns more than the one row expected
+		excludeTestsMatching 'CteTests.testInSubquery'
 
-		excludeTestsMatching 'SQLExceptionConversionTest.testIntegrityViolation'  // No integrity checking in NuoDB
-
-        // Returned no results, 1 expected
-		excludeTestsMatching 'CriteriaMultiselectGroupByAndOrderByTest.testCriteriaGroupByAndOrderByAndHaving'
+        // These fail due to an HQL syntax error at the JOIN even though HQL supposedly supports
+        // JOIN in UPDATE and DELETE From 6.5.  JPA doesn't support it anyway.
+        excludeTestsMatching 'org.hibernate.orm.test.query.hql.DeleteJoinTests'
+        excludeTestsMatching 'org.hibernate.orm.test.query.hql.UpdateJoinTests'
 
         // Missing table
-        excludeTestsMatching 'TypeParameterTest.testLoading'
-		excludeTestsMatching 'TypeParameterTest.testSave'
+        excludeTestsMatching 'org.hibernate.orm.test.typeparameters.TypeParameterTest.testLoading'
+		excludeTestsMatching 'org.hibernate.orm.test.typeparameters.TypeParameterTest.testSave'
 
-        // Contraint errors
-        excludeTestsMatching 'UniqueConstraintDropTest.testUniqueConstraintIsDropped'  // not dropped
-		excludeTestsMatching 'SchemaUpdateTest.testSchemaUpdateAndValidation' // Our contraint names are case sensitive
-
-        // Test works, but clean up generates invalid SQL
-        excludeTestsMatching 'ASTParserLoadingTest.testCollectionFetchWithDistinctionAndLimit'
-
-        // Not sure what this should be showing
-        excludeTestsMatching 'CriteriaLiteralWithSingleQuoteTest.testLiteralProjectionAndGroupBy'
-
-        // Timezones and timestamps. Several of these fai leven though expected and actual match
+        // Timezones and timestamps. Several of these fail even though expected and actual match
         excludeTestsMatching 'org.hibernate.orm.test.type.LocalDateTest.nativeWriteThenRead'
         excludeTestsMatching 'org.hibernate.orm.test.type.LocalDateTest.writeThenNativeRead'
         excludeTestsMatching 'org.hibernate.orm.test.type.LocalDateTest.nativeWriteThenRead'
@@ -129,39 +102,9 @@ test {
 		excludeTestsMatching 'JavaTimeJdbcTypeTests.testLocalDateTime'
 		excludeTestsMatching 'JavaTimeJdbcTypeTests.testLocalTime'
 
-        // Test breaks Hibernate's SQL generator
-        excludeTestsMatching 'org.hibernate.orm.test.query.hql.set.SetOperationTest.testAlternatingSetOperator' // No such element exception
-
-        // Sequence failing
-        excludeTestsMatching 'org.hibernate.orm.test.secondarytable.*' 
-        excludeTestsMatching 'org.hibernate.orm.test.id.enhanced.*'
-        excludeTestsMatching 'org.hibernate.orm.test.id.sequence.*'
-        excludeTestsMatching 'org.hibernate.orm.test.schemaupdate.idgenerator.SequenceGeneratorIncrementTest.*'
-        excludeTestsMatching 'org.hibernate.orm.test.batch.BatchSelectAndForceIncrementVersionTest.testBatchOptimisticForceIncrement'
-        excludeTestsMatching 'org.hibernate.orm.test.batch.BatchSelectAndForceIncrementVersionTest.testBatchPessimisticForceIncrement'
-		excludeTestsMatching 'SequenceInformationTest.test'
-		excludeTestsMatching 'SequenceGeneratorTest.testStartOfSequence'
-		excludeTestsMatching 'SequenceMismatchStrategyFixWithSequenceGeneratorTest.test'
-		//includeTestsMatching 'SequenceMismatchStrategyDefaultExceptionTest.test'
-		//includeTestsMatching 'SequenceMismatchStrategyExceptionEnumTest.test'
-		//includeTestsMatching 'SequenceMismatchStrategyLogTest.test'
-
-        // Empty row and over clauses in 
-		excludeTestsMatching 'CriteriaTimeoutTest.testCreateMutationQueryCriteriaInsertSelect'
-
-        // NULL pointer error
-		excludeTestsMatching 'CriteriaWindowFunctionTest'
-
-        // Batch update returns 1 row instead of 0
-        excludeTestsMatching 'org.hibernate.orm.test.batch.BatchOptimisticLockingTest.testBatchAndOptimisticLocking '
-
-        excludeTestsMatching 'org.hibernate.orm.test.bootstrap.scanning.PackagedEntityManagerTest' // Can't find persistence.xml files
-        excludeTestsMatching 'org.hibernate.orm.test.bootstrap.scanning.ScannerTest' // Can't find orm.xml files
-
-        //excludeTestsMatching 'org.hibernate.orm.test.filter.DynamicFilterTest.testFiltersOnMultiTableHqlDelete' // Undefined reference in DELETE
-        //excludeTestsMatching 'org.hibernate.orm.test.filter.DynamicFilterTest.testFiltersOnSimpleHqlDelete' // Undefined reference in DELETE
-
-        excludeTestsMatching 'org.hibernate.orm.test.filter.FilterParameterTests'  // Four tests don't throw expected exception, the other 10 pass
+        // Four tests don't throw expected exception, the other 10 pass. Because it's paramtereized,
+        // it's not possible to exclude just the failing tests
+        excludeTestsMatching 'org.hibernate.orm.test.filter.FilterParameterTests'
 
         // Contrived LIKE patterns fail (3 tests)
         excludeTestsMatching 'LikeEscapeDefaultTest'
@@ -239,7 +182,6 @@ test {
         excludeTestsMatching 'HQLTest.test_hql_derived_join_example' // LEFT OUTER JOIN requires ON clause - use 6.6 emulation?
 		excludeTestsMatching 'SQLExceptionConversionTest.testIntegrityViolation'  // No integrity checking in NuoDB
         excludeTestsMatching 'org.hibernate.orm.test.query.SubQueryInFrom*'  // Predicate 1 is not a boolean operation
-		excludeTestsMatching 'CteTests.testSubquery'  // emulation -> unsupported SQL construct
 		excludeTestsMatching 'org.hibernate.orm.test.join.OuterJoinTest.testJoinOrderWithRightJoinWithInnerImplicitJoins' // Dependent RIGHT OUTER JOIN
         excludeTestsMatching 'org.hibernate.orm.test.temporal.TimePropertyTest'  // Can't use a DATE as a TIME
 
@@ -249,7 +191,7 @@ test {
         excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testDurationSubtractionWithDatetimeLiterals' // Expected: <PT840H> but was: <null> 
         excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testDurationBy' // No result found for query [select e.theDuration from EntityOfBasics e] 
         excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testDurationLiterals' //  No result found for query [select e.theDuration from EntityOfBasics e] 
-        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testExtractFunctionWeek'  // WEEK not implemented
+        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testExtractFunctionWeek'  // Extract WEEK not implemented
         excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testExtractFunctionWithAssertions' // IndexOutOfBounds Index 0 out of bounds for length 0 
         excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testHyperbolic' // No result found for query [select sinh(e.theDouble) from EntityOfBasics e] 
         excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testImplicitCollectionJoinInSelects' // Expected: (a collection containing <0> and a collection containing <1>)  but: a collection containing <0> 
@@ -261,31 +203,29 @@ test {
 
         excludeTestsMatching 'org.hibernate.orm.test.query.criteria.CriteriaBuilderNonStandardFunctionsTest.testLog' // LOG() not supported
 
-        excludeTestsMatching 'org.hibernate.orm.test.query.hql.StandardFunctionTests.testLog' // ln() not implemented
-        excludeTestsMatching 'org.hibernate.orm.test.query.hql.StandardFunctionTests.testMathFunctions' // ln() not implemented
-        excludeTestsMatching 'org.hibernate.orm.test.query.hql.StandardFunctionTests.testExtractFunction' // WEEK not implemented
-		excludeTestsMatching 'org.hibernate.orm.test.query.hql.StandardFunctionTests.testExtractFunctionWithAssertions' // WEEK not implemented
-
         // We do not support pooled sequences as Hibernate expects to use them, and the start and
-        // increment info is not available anyway
-		excludeTestsMatching 'SequenceInformationTest.test'
+        // increment info is not available either.
+        excludeTestsMatching 'org.hibernate.orm.test.batch.BatchSelectAndForceIncrementVersionTest.testBatchOptimisticForceIncrement'
+        excludeTestsMatching 'org.hibernate.orm.test.batch.BatchSelectAndForceIncrementVersionTest.testBatchPessimisticForceIncrement'
+		excludeTestsMatching 'org.hibernate.orm.test.dialect.functional.SequenceInformationTest.test'
+        excludeTestsMatching 'org.hibernate.orm.test.id.enhanced.*'
+        excludeTestsMatching 'org.hibernate.orm.test.id.sequence.*'
+		excludeTestsMatching 'org.hibernate.orm.test.id.SequenceGeneratorTest.testStartOfSequence'
         excludeTestsMatching 'org.hibernate.orm.test.schemaupdate.idbag.IdBagSequenceTest'
+        excludeTestsMatching 'org.hibernate.orm.test.schemaupdate.idgenerator.SequenceGeneratorIncrementTest.*'
+        excludeTestsMatching 'org.hibernate.orm.test.secondarytable.*' 
+		excludeTestsMatching 'org.hibernate.orm.test.id.hhh12973.SequenceMismatchStrategyFixWithSequenceGeneratorTest.test'
+
+        // Tests explicity look for CROSS JOIN in SQL, but work otherwise
+		excludeTestsMatching 'JpaCrossJoinTests.test2Roots'
+		excludeTestsMatching 'JpaCrossJoinTests.test2Roots2'
+
+        // Contraint errors
+        excludeTestsMatching 'UniqueConstraintDropTest.testUniqueConstraintIsDropped'  // not dropped
+		excludeTestsMatching 'SchemaUpdateTest.testSchemaUpdateAndValidation' // Our constraint names are case sensitive
 
         // Tests to check Hibernate resolver can find a dummy test Dialect, but we have hard-wired tests to use NuoDB
         excludeTestsMatching 'org.hibernate.orm.test.dialect.resolver.DiscoveredDialectResolverTests'
-
-        // Sub-select alias with parameters "(SELECT ...) alias(a, b)" not supported
-        // Try to use 6.6 emulation?
-        excludeTestsMatching 'HQLTest.test_hql_derived_root_example' // Multi-valued alias d1_0(owner_id,payed) 
-		excludeTestsMatching 'CteTests.testBasic'
-		excludeTestsMatching 'CteTests.testBasicJoined'
-		excludeTestsMatching 'CteTests.testMaterialized'
-		excludeTestsMatching 'CteTests.testNested'
-		excludeTestsMatching 'FunctionsWithAnonymousTupleTest'
-		excludeTestsMatching 'org.hibernate.orm.test.hql.NestedSubqueryTest.testNestedHqlSubQueries*'
-		excludeTestsMatching 'CriteriaMultiselectGroupByAndOrderByTest.testSubqueryGroupBy'
-		excludeTestsMatching 'CriteriaMultiselectGroupByAndOrderByTest.testSubqueryGroupByAndOrderBy'
-		excludeTestsMatching 'CriteriaMultiselectGroupByAndOrderByTest.testSubqueryGroupByAndOrderByAndHaving'
 
         // sign() function in @Formula annotation is used as-is - the registered emulation is ignored
         excludeTestsMatching 'FormulaWithPartitionByTest'
@@ -352,6 +292,8 @@ test {
         excludeTestsMatching 'org.hibernate.orm.test.query.hql.StandardFunctionTests.testLog' // ln() not implemented
         excludeTestsMatching 'org.hibernate.orm.test.query.hql.StandardFunctionTests.testMathFunctions' // ln() not implemented
 
+        excludeTestsMatching 'FetchClausePaginationTest.testFetchWithTies' // WITH TIES not supported 
+
         excludeTestsMatching 'org.hibernate.orm.test.query.hql.StandardFunctionTests.testExtractFunction' // WEEK not implemented
 		excludeTestsMatching 'org.hibernate.orm.test.query.hql.StandardFunctionTests.testExtractFunctionWithAssertions' // WEEK not implemented
         excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testExtractFunctionWeek'  // WEEK not implemented
@@ -360,8 +302,8 @@ test {
         excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testCastFunction' // NuoDB doesn't automatically truncate. No result found for query [select cast(e.theBoolean as String) from EntityOfBasics e] 
         excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testAddSecondsWithFractionalPart' // Loses fractional part
 
-        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testCastStringToBoolean' // SELECT ... UNION  SELECT  wihtout FROM not supported 
-                                       // select (select v.x from (select true x ^union all select false) v left join (select 't' k,true v union all select 'true',true union all select 'y',true union all select '1',true union all select 'f',false union all select 'false',false union all select 'n',false union all select '0',false) t on lower('1')=t.k where t.v is null or v.x=t.v) FROM Dual 
+        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testCastStringToBoolean' // SELECT ... UNION , SELECT  without FROM not supported 
+                // select (select v.x from (select true x ^union all select false) v left join (select 't' k,true v union all select 'true',true union all select 'y',true union all select '1',true union all select 'f',false union all select 'false',false union all select 'n',false union all select '0',false) t on lower('1')=t.k where t.v is null or v.x=t.v) FROM Dual 
         excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testColumnFunction' // Expected: <the string> but was: <null> 
         excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testDateTruncWithOffsetFunction' // Expected: one of {<1974-10-03T00:00-12:00>, <1974-10-04T00:00Z>} but: was <1974-10-03T23:00Z> 
         excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testDurationArithmeticWithLiterals' // Expected: <PT120H> but was: <null> 
@@ -419,7 +361,13 @@ test {
         excludeTestsMatching 'org.hibernate.orm.test.type.ShortArrayTest.testQuery'
         excludeTestsMatching 'org.hibernate.orm.test.type.TimeArrayTest.testQuery'
         excludeTestsMatching 'org.hibernate.orm.test.type.TimestampArrayTest.testQuery'
+		excludeTestsMatching 'org.hibernate.orm.test.query.CteTests.testSubquery'
 		excludeTestsMatching 'org.hibernate.orm.test.query.hql.DistinctFromTest'
+		excludeTestsMatching 'org.hibernate.orm.test.jpa.criteria.CriteriaQualifiedJoinTest.testJoinLateral'
+        excludeTestsMatching 'org.hibernate.orm.test.jpa.query.CorrelationCteDerivedJoinTest.tesCte'
+        excludeTestsMatching 'org.hibernate.orm.test.jpa.query.CorrelationCteDerivedJoinTest.tesDerivedJoin'
+        excludeTestsMatching 'org.hibernate.orm.test.jpa.query.CorrelationCteDerivedRootTest.tesCte'
+        excludeTestsMatching 'org.hibernate.orm.test.jpa.query.CorrelationCteDerivedRootTest.tesDerivedRoot'
 
         // Subqueries in ORDER BY clause
         excludeTestsMatching 'org.hibernate.orm.test.hql.size.filter.WhereAnnotatedOneToManySizeTest.orderBy_sizeOf'
