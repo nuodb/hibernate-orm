@@ -27,8 +27,6 @@ import org.hibernate.dialect.PostgresPlusDialect;
 import org.hibernate.dialect.SQLServerDialect;
 import org.hibernate.dialect.SybaseASEDialect;
 import org.hibernate.dialect.SybaseDialect;
-import org.hibernate.orm.test.query.hql.FunctionTests.Pair;
-import org.hibernate.orm.test.query.hql.FunctionTests.Triple;
 import org.hibernate.community.dialect.TiDBDialect;
 import org.hibernate.query.sqm.produce.function.FunctionArgumentException;
 import org.hibernate.sql.exec.ExecutionException;
@@ -2196,7 +2194,7 @@ public class FunctionTests {
 							.list();
 					// NUODB: START  No support for extract(WEEK)
 					if (!DialectContext.getDialect().getClass().getName().contains("nuodb")) {
-						session.createQuery("select extract(week of year from current date) from EntityOfBasics e", Integer.class)
+					session.createQuery("select extract(week of year from current date) from EntityOfBasics e", Integer.class)
 							.list();
 					}
 					// NUODB: END
@@ -2308,18 +2306,18 @@ public class FunctionTests {
 
 					// NUODB: START  No support for extract(WEEK)
 					if (!DialectContext.getDialect().getClass().getName().contains("nuodb")) {
-						assertThat(
-								session.createQuery("select extract(week from date 2019-05-27) from EntityOfBasics", Integer.class).getResultList().get(0),
-								is(22)
-						);
-						assertThat(
-								session.createQuery("select extract(week from date 2019-06-02) from EntityOfBasics", Integer.class).getResultList().get(0),
-								is(22)
-						);
-						assertThat(
-								session.createQuery("select extract(week from date 2019-06-03) from EntityOfBasics", Integer.class).getResultList().get(0),
-								is(23)
-						);
+					assertThat(
+							session.createQuery("select extract(week from date 2019-05-27) from EntityOfBasics", Integer.class).getResultList().get(0),
+							is(22)
+					);
+					assertThat(
+							session.createQuery("select extract(week from date 2019-06-02) from EntityOfBasics", Integer.class).getResultList().get(0),
+							is(22)
+					);
+					assertThat(
+							session.createQuery("select extract(week from date 2019-06-03) from EntityOfBasics", Integer.class).getResultList().get(0),
+							is(23)
+					);
 					}
 					// NUODB: END
 

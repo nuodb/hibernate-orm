@@ -12,7 +12,7 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 
 import org.hibernate.annotations.SortNatural;
-import org.hibernate.orm.test.annotations.manytomany.ManyToManyInverseJoinColumnSortedSetTest.ContainedEntity;
+
 import org.hibernate.testing.orm.junit.DomainModel;
 import org.hibernate.testing.orm.junit.JiraKey;
 

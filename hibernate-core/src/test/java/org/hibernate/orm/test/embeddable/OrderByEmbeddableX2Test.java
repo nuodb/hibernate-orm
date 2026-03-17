@@ -46,7 +46,8 @@ public class OrderByEmbeddableX2Test {
 		} );
 
 		factoryScope.inTransaction( session -> {
-			Query<Containing> query = session.createQuery( "select c from containing c order by c.id asc", Containing.class );
+			// NuoDB: 'containing' is reserved word
+			Query<Containing> query = session.createQuery( "select c from xcontaining c order by c.id asc", Containing.class );
 
 			List<Containing> resultList = query.getResultList();
 			assertThat( resultList ).hasSize( 3 );

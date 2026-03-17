@@ -361,7 +361,7 @@ public class ExpressionsTest {
 									builder.duration(2, TemporalUnit.DAY) ) ) );
 					assertEquals( Duration.ofDays(2), entityManager.createQuery(criteria).getSingleResult() );
 				}
-			);
+		);
 		}
 		// NUODB: END
 		scope.inTransaction( entityManager -> {

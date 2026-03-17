@@ -33,6 +33,8 @@ if (nuodbJdbcJarVersion.toString().compareTo("24.2.2") < 0)
 else
     println("Skipping NClob tests - compliant NuoDB JDBC JAR version: ${nuodbJdbcJarVersion}");
 
+println "Building Hibernate Version ${version}, testing against ${db}"
+
 // --------------------------------------------------------------------- //
 // -          Control which tests are included or excluded 6.6         - //
 // --------------------------------------------------------------------- //
@@ -47,7 +49,7 @@ test {
         // org.hibernate.orm.test.boot.database.metadata.MetadataAccessTests - Modify to only test with NuoDB
         // org.hibernate.orm.test.dialect.resolver.DialectFactoryTest  - add our Dialect
         // org.hibernate.orm.test.jpa.criteria.basic.ExpressionsTest - skip comparison of TIME intervals
-        // org.hibernate.orm.test.jpa.metadata.TypesafeNamedQueryTest.java - added a 1s delay so timetamps differ
+        // org.hibernate.orm.test.jpa.metadata.TypesafeNamedQueryTest.java - added a 1s delay so timeStamps differ
         // org.hibernate.orm.test.query.hql.FunctionTests = Skips queries using ln(), log(), log10(), extract(WEEK ...)
         // org.hibernate.orm.test.query.hql.StandardFunctionTests - ignore ln(), extract(WEEK ...)
         // org.hibernate.orm.test.query.QueryTimeOutTest - add our dialect (we use same syntax as Oracle)
@@ -73,15 +75,12 @@ test {
         excludeTestsMatching 'org.hibernate.orm.test.hql.BulkManipulationTest.testInsertWithManyToOne' // Undefined reference to DESCRIPTION
         excludeTestsMatching 'org.hibernate.orm.test.hql.BulkManipulationTest.testInsertWithSelectListUsingJoins'
 
+        excludeTestsMatching 'org.hibernate.orm.test.stateless.StatelessSessionMultipleOpsSubsequentBatchTest.testDeleteMultipleSubsequentBatch'
+        excludeTestsMatching 'org.hibernate.orm.test.stateless.StatelessSessionMultipleOpsSubsequentBatchTest.testInsertMultipleSubsequentBatch'
+        excludeTestsMatching 'org.hibernate.orm.test.stateless.StatelessSessionMultipleOpsSubsequentBatchTest.testUpdateMultipleSubsequentBatch' 
+
         // WARNING: Failing tests from this class leak connections and exhaust the pool, so all subsequent tests fail
         excludeTestsMatching 'org.hibernate.orm.test.hql.ASTParserLoadingTest.testEJBQLFunctions' // Cannot compare INTEGER to OBJECT?
-        //includeTestsMatching 'ASTParserLoadingTest.testAnyMappingReference'
-        //includeTestsMatching 'ASTParserLoadingTest.testComponentParameterBinding'
-        //includeTestsMatching 'ASTParserLoadingTest.testComponentQueries'
-        //includeTestsMatching 'ASTParserLoadingTest.testRowValueConstructorSyntaxInInList'
-
-        // Not sure what this should be showing, but it exposed a strange behavior where Hibernate generates: SELECT .... GROUP BY ().
-        //includeTestsMatching 'CriteriaLiteralWithSingleQuoteTest.testLiteralProjectionAndGroupBy'
 
         // undefined reference to "V1_0"."NAME", presumably because 'v1_'0' is only valid within the join in brackets
         // select  li1_0.id, li1_0.order_id, li1_0.product_id, li1_0.quantity, li1_0.subTotal  from  LineItem li1_0
@@ -91,10 +90,9 @@ test {
         excludeTestsMatching 'org.hibernate.orm.test.query.hql.JpaCrossJoinBaselineTests.testCrossJoin'
 
         // Timezones and timestamps. Several of these fail even though expected and actual match
-        excludeTestsMatching 'org.hibernate.orm.test.type.LocalDateTest.nativeWriteThenRead'
-        excludeTestsMatching 'org.hibernate.orm.test.type.LocalDateTest.writeThenNativeRead'
-        excludeTestsMatching 'org.hibernate.orm.test.type.LocalDateTest.nativeWriteThenRead'
-        excludeTestsMatching 'org.hibernate.orm.test.type.LocalDateTest.writeThenRead'
+        excludeTestsMatching 'org.hibernate.orm.test.type.temporal.LocalDateTest.nativeWriteThenRead'
+        excludeTestsMatching 'org.hibernate.orm.test.type.temporal.LocalDateTest.writeThenNativeRead'
+        excludeTestsMatching 'org.hibernate.orm.test.type.temporal.LocalDateTest.writeThenRead'
    
         // Timezone not picked up from Hibernate
         excludeTestsMatching 'org.hibernate.orm.test.timestamp.JdbcTimeCustomTimeZoneTest.testTimeZone'
@@ -102,36 +100,12 @@ test {
         excludeTestsMatching 'org.hibernate.orm.test.timestamp.JdbcTimestampCustomTimeZoneTest.testTimeZone'
 
         // Can't convert LocalDate, LocalTime, LocalDateTime to column type
-		excludeTestsMatching 'GlobalJavaTimeJdbcTypeTests.testLocalDate'
-		excludeTestsMatching 'GlobalJavaTimeJdbcTypeTests.testLocalDateTime'
-		excludeTestsMatching 'GlobalJavaTimeJdbcTypeTests.testLocalTime'
-		excludeTestsMatching 'JavaTimeJdbcTypeTests.testLocalDate'
-		excludeTestsMatching 'JavaTimeJdbcTypeTests.testLocalDateTime'
-		excludeTestsMatching 'JavaTimeJdbcTypeTests.testLocalTime'
-
-        // Test breaks Hibernate's SQL generator
-        //excludeTestsMatching 'org.hibernate.orm.test.query.hql.set.SetOperationTest.testAlternatingSetOperator' // No such element exception
-
-        // Sequence failing
-        // includeTestsMatching 'org.hibernate.orm.test.secondarytable.HHH18813Test' 
-        // includeTestsMatching 'org.hibernate.orm.test.secondarytable.SecondaryRowTest' 
-        // includeTestsMatching 'org.hibernate.orm.test.id.enhanced.*'
-        // includeTestsMatching 'org.hibernate.orm.test.id.sequence.*'
-        // includeTestsMatching 'org.hibernate.orm.test.schemaupdate.idgenerator.SequenceGeneratorIncrementTest.*'
-        // includeTestsMatching 'org.hibernate.orm.test.batch.BatchSelectAndForceIncrementVersionTest.testBatchOptimisticForceIncrement'
-        // includeTestsMatching 'org.hibernate.orm.test.batch.BatchSelectAndForceIncrementVersionTest.testBatchPessimisticForceIncrement'
-		// includeTestsMatching 'SequenceInformationTest.test'
-		// includeTestsMatching 'SequenceGeneratorTest.testStartOfSequence'
-		// includeTestsMatching 'SequenceMismatchStrategyFixWithSequenceGeneratorTest.test'
-		// includeTestsMatching 'SequenceMismatchStrategyDefaultExceptionTest.test'
-		// includeTestsMatching 'SequenceMismatchStrategyExceptionEnumTest.test'
-		// includeTestsMatching 'SequenceMismatchStrategyLogTest.test'
-
-        //excludeTestsMatching 'org.hibernate.orm.test.bootstrap.scanning.PackagedEntityManagerTest' // Can't find persistence.xml files
-        //excludeTestsMatching 'org.hibernate.orm.test.bootstrap.scanning.ScannerTest' // Can't find orm.xml files
-
-        //includeTestsMatching 'org.hibernate.orm.test.filter.DynamicFilterTest.testFiltersOnMultiTableHqlDelete' // Undefined reference in DELETE
-        //includeTestsMatching 'org.hibernate.orm.test.filter.DynamicFilterTest.testFiltersOnSimpleHqlDelete' // Undefined reference in DELETE
+		excludeTestsMatching 'org.hibernate.orm.test.mapping.javatime.GlobalJavaTimeJdbcTypeTests.testLocalDate'
+		excludeTestsMatching 'org.hibernate.orm.test.mapping.javatime.GlobalJavaTimeJdbcTypeTests.testLocalDateTime'
+		excludeTestsMatching 'org.hibernate.orm.test.mapping.javatime.GlobalJavaTimeJdbcTypeTests.testLocalTime'
+		excludeTestsMatching 'org.hibernate.orm.test.mapping.javatime.JavaTimeJdbcTypeTests.testLocalDate'
+		excludeTestsMatching 'org.hibernate.orm.test.mapping.javatime.JavaTimeJdbcTypeTests.testLocalDateTime'
+		excludeTestsMatching 'org.hibernate.orm.test.mapping.javatime.JavaTimeJdbcTypeTests.testLocalTime'
 
         // Why do these query tests fail?
         excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testColumnFunction' // Expected: <the string> but was: <null> 
@@ -165,7 +139,7 @@ test {
             excludeTestsMatching 'org.hibernate.orm.test.mapping.basic.NClobStringTest'
             excludeTestsMatching 'org.hibernate.orm.test.mapping.basic.NationalizedTest'
             excludeTestsMatching 'org.hibernate.orm.test.mapping.basic.StringNationalizedMappingTests'
-            excludeTestsMatching 'NClobTest.test'
+            excludeTestsMatching 'org.hibernate.orm.test.mapping.basic.NClobTest.test'
             excludeTestsMatching 'org.hibernate.orm.test.nationalized.NationalizedLobFieldTest'
             excludeTestsMatching 'org.hibernate.orm.test.type.LobUnfetchedPropertyTest.testNClob'
         } else {
@@ -176,9 +150,12 @@ test {
             println "hibernate-core.gradle: Excluding tests using NuoDB 7 features"
 
             // FULL OUTER JOIN not supported until NuoDB 7
-            excludeTestsMatching 'EntityJoinWithJoinedInheritanceTest.testFullJoin'
-            excludeTestsMatching 'EntityJoinWithSingleTableInheritanceTest.testFullJoin'
-            excludeTestsMatching 'EntityJoinWithTablePerClassInheritanceTest.testFullJoin'
+            excludeTestsMatching 'org.hibernate.orm.test.inheritance.EntityJoinWithJoinedInheritanceTest.testFullJoin'
+            excludeTestsMatching 'org.hibernate.orm.test.inheritance.EntityJoinWithSingleTableInheritanceTest.testFullJoin'
+            excludeTestsMatching 'org.hibernate.orm.test.inheritance.EntityJoinWithTablePerClassInheritanceTest.testFullJoin'
+            excludeTestsMatching 'org.hibernate.orm.test.inheritance.join.EntityJoinWithJoinedInheritanceTest.testFullJoin'
+            excludeTestsMatching 'org.hibernate.orm.test.inheritance.join.EntityJoinWithSingleTableInheritanceTest.testFullJoin'
+            excludeTestsMatching 'org.hibernate.orm.test.inheritance.join.EntityJoinWithTablePerClassInheritanceTest.testFullJoin'
             excludeTestsMatching 'org.hibernate.orm.test.join.OuterJoinTest.testJoinOrderWithFullJoin'
             excludeTestsMatching 'org.hibernate.orm.test.join.OuterJoinTest.testJoinOrderWithFullJoinWithIdDereference'
             excludeTestsMatching 'org.hibernate.orm.test.join.OuterJoinTest.testJoinOrderWithFullNormalJoin'
@@ -200,11 +177,11 @@ test {
 		    excludeTestsMatching 'org.hibernate.orm.test.query.hql.InsertSelectTests.testInsertSelectDistinct'
 
             // INTERSECT and EXCEPT 
-            excludeTestsMatching 'org.hibernate.orm.test.bootstrap.binding.annotations.embedded.EmbeddedTest.testQueryWithEmbeddedParameterAllNull'
-            excludeTestsMatching 'org.hibernate.orm.test.bootstrap.binding.annotations.embedded.EmbeddedTest.testQueryWithEmbeddedParameterOneNull'
+		    excludeTestsMatching 'org.hibernate.orm.test.bootstrap.binding.annotations.embedded.EmbeddedTest.testQueryWithEmbeddedParameterAllNull'
+		    excludeTestsMatching 'org.hibernate.orm.test.bootstrap.binding.annotations.embedded.EmbeddedTest.testQueryWithEmbeddedParameterOneNull'
 		    excludeTestsMatching 'org.hibernate.orm.test.hql.HQLTest.test_hql_derived_join_example'
 
-		    excludeTestsMatching 'CriteriaQualifiedJoinTest.testJoinLateral'   // emulation -> unsupported SQL construct
+		    excludeTestsMatching 'org.hibernate.orm.test.jpa.criteria.CriteriaQualifiedJoinTest.testJoinLateral'
 
             excludeTestsMatching 'org.hibernate.orm.test.query.SubQueryInFromEmbeddedIdTests.testEntity'
             excludeTestsMatching 'org.hibernate.orm.test.query.SubQueryInFromEmbeddedIdTests.testEntityImplicit'
@@ -267,9 +244,9 @@ test {
             println "hibernate-core.gradle: Excluding tests needing HELPER_TYPE column"
 
             // JIRA DB-40465: Can't create table with HELPER_TYPE column. FIXED in 7.0.2
-            excludeTestsMatching 'IdClassPredicateTest.testCountIdClassAttributes'
-            excludeTestsMatching 'IdClassPredicateTest.testDeclaredIdClassAttributes'
-            excludeTestsMatching 'IdClassPredicateTest.testSupertypeIdClassAttributes'
+            excludeTestsMatching 'org.hibernate.orm.test.jpa.criteria.idclass.IdClassPredicateTest.testCountIdClassAttributes'
+            excludeTestsMatching 'org.hibernate.orm.test.jpa.criteria.idclass.IdClassPredicateTest.testDeclaredIdClassAttributes'
+            excludeTestsMatching 'org.hibernate.orm.test.jpa.criteria.idclass.IdClassPredicateTest.testSupertypeIdClassAttributes'
 
             // JIRA DB-40458: CASE statement weirdness cast(? AS VARCHAR (2147483647)). FIXED in 7.0.2
 		    excludeTestsMatching 'org.hibernate.orm.test.query.hql.CaseStatementTest.testSearchedCaseStatementWithAllParamResults'
@@ -279,54 +256,41 @@ test {
 
         // WEEK not implememted for extract()
         excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testExtractFunctionWeek'
-        //includeTestsMatching 'org.hibernate.orm.test.query.hql.StandardFunctionTests.testExtractFunction' // test modified to skip WEEK Tests 
-	    //includeTestsMatching 'org.hibernate.orm.test.query.hql.StandardFunctionTests.testExtractFunctionWithAssertions' // test modified to skip WEEK Tests 
 
         // Row number with 'ties' not supported. Requires dense_rank() apparently, but still fails
-        excludeTestsMatching 'FetchClausePaginationTest.testFetchWithTies'
-
-        // NuoDB quietly casts a boolean to a string, so the code runs without the expected exception
-        // Most databases do this and also exclude these tests
-        excludeTestsMatching 'org.hibernate.orm.test.filter.FilterParameterTests.testYesNoMismatch'
-        excludeTestsMatching 'org.hibernate.orm.test.filter.FilterParameterTests.testNumericMismatch'
+        excludeTestsMatching 'org.hibernate.orm.test.pagination.FetchClausePaginationTest.testFetchWithTies'
 
         // No support for first_value, nth_value, percent_rank, cume_dist()
-		excludeTestsMatching 'CriteriaWindowFunctionTest.testFrame'
-		excludeTestsMatching 'CriteriaWindowFunctionTest.testFirstValue'
-		excludeTestsMatching 'CriteriaWindowFunctionTest.testReusableWindow'
-		excludeTestsMatching 'CriteriaWindowFunctionTest.testNthValue'
-        excludeTestsMatching 'WindowFunctionTest.testFrame'
+		excludeTestsMatching 'org.hibernate.orm.test.query.criteria.CriteriaWindowFunctionTest.testFrame'
+		excludeTestsMatching 'org.hibernate.orm.test.query.criteria.CriteriaWindowFunctionTest.testFirstValue'
+		excludeTestsMatching 'org.hibernate.orm.test.query.criteria.CriteriaWindowFunctionTest.testReusableWindow'
+		excludeTestsMatching 'org.hibernate.orm.test.query.criteria.CriteriaWindowFunctionTest.testNthValue'
+        excludeTestsMatching 'org.hibernate.orm.test.query.hql.WindowFunctionTest.testFrame'
 
         // NuoDB requires ORDER BY with some window-functions
-		excludeTestsMatching 'CriteriaWindowFunctionTest.testRowNumberWithoutOrder'
-		excludeTestsMatching 'CriteriaTimeoutTest.testCreateMutationQueryCriteriaInsertSelect'
-        excludeTestsMatching 'WindowFunctionTest.testRowNumberWithoutOrder'
+		excludeTestsMatching 'org.hibernate.orm.test.query.criteria.CriteriaWindowFunctionTest.testRowNumberWithoutOrder'
+		excludeTestsMatching 'org.hibernate.orm.test.query.criteria.CriteriaTimeoutTest.testCreateMutationQueryCriteriaInsertSelect'
+        excludeTestsMatching 'org.hibernate.orm.test.query.hql.WindowFunctionTest.testRowNumberWithoutOrder'
 		excludeTestsMatching 'org.hibernate.orm.test.query.criteria.InsertSelectTests.simpleTest'
 
         // Table and column names must be unique. Even if quoted, "Table1" and "TABLE1" are considered the same.
         excludeTestsMatching 'org.hibernate.orm.test.schemaupdate.SchemaUpdateTest'
 
-        // sign() function in @Formula annotation is used as-is - the registered emulation is ignored
-        //excludeTestsMatching 'FormulaWithPartitionByTest'
-
         // TIMESTAMP precision is always 6 (MICROSECONDS)
         excludeTestsMatching 'org.hibernate.orm.test.temporal.FractionalSecondsTests.testUsage0'  // Expects precision(0)
         excludeTestsMatching 'org.hibernate.orm.test.temporal.FractionalSecondsTests.testUsage3'  // Expects precision(3)
-        //excludeTestsMatching 'org.hibernate.orm.test.temporal.FractionalSecondsTests.testUsage9'
         excludeTestsMatching 'org.hibernate.orm.test.temporal.JavaTimeFractionalSecondsTests.testUsage0'  // Expects precision(0)
         excludeTestsMatching 'org.hibernate.orm.test.temporal.JavaTimeFractionalSecondsTests.testUsage3'  // Expects precision(3)
-        //excludeTestsMatching 'org.hibernate.orm.test.temporal.JavaTimeFractionalSecondsTests.testUsage9'
 
         // CASCADE DELETE not supported
         excludeTestsMatching 'ManyToManyBidirectionalTest.testRemoveMappedBySide'
-    	excludeTestsMatching 'ToOneOnDeleteTest.testManyToOne'
+    	excludeTestsMatching 'org.hibernate.orm.test.tondelete.toone.ToOneOnDeleteTest.testManyToOne'
 
         // Dependent Right Outer Join not supported even in 7
         excludeTestsMatching 'org.hibernate.orm.test.join.OuterJoinTest.testJoinOrderWithRightJoinWithInnerImplicitJoins'
-        //excludeTestsMatching 'org.hibernate.orm.test.join.OuterJoinTest.testJoinOrderWithFullJoin'
 
         // No support for UPDATE ... ON CONFLICT
-        excludeTestsMatching 'InsertConflictTests'
+        excludeTestsMatching 'org.hibernate.orm.test.query.hql.InsertConflictTests'
 
         // Type implementation mismatches
         excludeTestsMatching 'org.hibernate.orm.test.jpa.query.NativeQueryResultTypeAutoDiscoveryTest.tinyintType'  // No support for the tinyint datatype so we use smallint
@@ -338,7 +302,7 @@ test {
         excludeTestsMatching 'org.hibernate.orm.test.jpa.query.NativeQueryResultTypeAutoDiscoveryTest.longBinaryType'  // NuoDB maps LONGVARCHAR to BLOB
 
         // JIRA DB-37128: NuoDB Byte cannot be set to a negative value using a PreparedStatement. OPEN
-        excludeTestsMatching 'ByteTest.testByteDataPersistenceAndRetrieval'
+        excludeTestsMatching 'org.hibernate.orm.test.typedescriptor.ByteTest.testByteDataPersistenceAndRetrieval'
 
         // NuoDB has no UUID type
 		excludeTestsMatching 'org.hibernate.orm.test.tenantidpk.TenantPkTest'
@@ -346,19 +310,13 @@ test {
         // NuoDB requires ORDER BY whenever GROUP BY  is used. This generates a query without.
 		excludeTestsMatching 'org.hibernate.orm.test.query.hql.InsertSelectTests.testInsertSelectGroupBy'
 
-
-        // JIRA DB-40459: Problem with atan2, FIXED in NuoDB 7.0.2
-        // Dialect modified to swap arguments in earlier releases.
-        // if (nuodbDatabaseVersion.isAfter("7.0.1"))
-        //     excludeTestsMatching 'CriteriaBuilderNonStandardFunctionsTest.testAtan2'
-
         // NuoDB does not use Catalogs
-        excludeTestsMatching 'org.hibernate.orm.test.boot.database.qualfiedTableNaming.DefaultCatalogAndSchemaTest'
+        excludeTestsMatching 'org.hibernate.orm.test.boot.database.qualfiedTableNaming.DefaultCatalogAndSchemaTest.updateSchema_fromSessionFactory'
 
         // NuoDB does not take read locks
-        excludeTestsMatching 'LockTest.testUpdateWithPessimisticReadLockSkipLocked'  
-    	//excludeTestsMatching 'FollowOnLockingTest.testQueryLockingWithFollowOn'
-    	excludeTestsMatching 'FollowOnLockingTest.testQueryLockingWithoutFollowOn'
+        excludeTestsMatching 'org.hibernate.orm.test.jpa.LockTest.testUpdateWithPessimisticReadLockSkipLocked'  
+    	//excludeTestsMatching 'org.hibernate.orm.test.locking.jpa.FollowOnLockingTest.testQueryLockingWithFollowOn'
+    	excludeTestsMatching 'org.hibernate.orm.test.locking.jpa.FollowOnLockingTest.testQueryLockingWithoutFollowOn'
 
         // Functions NuoDB doesn't support
         excludeTestsMatching 'org.hibernate.orm.test.query.criteria.CriteriaBuilderNonStandardFunctionsTest.testLog' // LOG() not supported
@@ -369,8 +327,8 @@ test {
         //excludeTestsMatching 'org.hibernate.orm.test.query.hql.StandardFunctionTests.testMathFunctions' // ln() not implemented, test modified to skip it
 
         // Miscellaneous behaviours NuoDB doesn't support
-        excludeTestsMatching 'NamedQueryCommentTest' // our query hints go after select/update not before
-		excludeTestsMatching 'NullPrecedenceTest.testNullPrecedence'  // NuoDB does not support NULL precedence
+        excludeTestsMatching 'org.hibernate.orm.test.jpa.query.NamedQueryCommentTest' // our query hints go after select/update not before
+		excludeTestsMatching 'org.hibernate.orm.test.query.criteria.internal.NullPrecedenceTest.testNullPrecedence'  // NuoDB does not support NULL precedence
 
         // Function tests that NuoDB can't support
         excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testCastBinaryWithLength'  // NuoDB doesn't automatically truncate
@@ -389,7 +347,6 @@ test {
         excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testDurationLiterals' //  No result found for query [select e.theDuration from EntityOfBasics e] 
         excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testExtractFunctionTimeZone' // SQLGrammar exception unexpected timezone_hour
                                        // select extract(^timezone_hour from eob1_0.the_zoned_date_time) from EntityOfBasics eob1_0 
-        //excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testExtractFunctionWithAssertions' // IndexOutOfBounds Index 0 out of bounds for length 0 
         excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testExtractOffsetHourMinute' //SQLGrammar JDBC exception
                                        // select extract(^timezone_hour from {ts '2024-02-05 09:18:12.000000000'}) FROM Dual 
 
@@ -401,25 +358,24 @@ test {
 		excludeTestsMatching 'org.hibernate.orm.test.instant.InstantWithNormalizedTest.test'
 
         // WITH (a, b, ...) AS (subquery) is illegal syntax
-		excludeTestsMatching 'org.hibernate.orm.test.query.CteTests.testInSubquery' // Returns more than one row
-		excludeTestsMatching 'org.hibernate.orm.test.query.CteTests.testSubquery'   // emulation -> unsupported SQL construct
         excludeTestsMatching 'org.hibernate.orm.test.hql.HQLTest.test_hql_cte_materialized_example'
         excludeTestsMatching 'org.hibernate.orm.test.jpa.criteria.cte.CriteriaCteCopyTest.testValidRootQuery'
         excludeTestsMatching 'org.hibernate.orm.test.jpa.criteria.cte.CriteriaCteCopyTest.testValidSubQuery'
+        excludeTestsMatching 'org.hibernate.orm.test.jpa.query.CorrelationCteDerivedJoinTest.tesCte'
+        excludeTestsMatching 'org.hibernate.orm.test.jpa.query.CorrelationCteDerivedJoinTest.tesDerivedJoin'
+        excludeTestsMatching 'org.hibernate.orm.test.jpa.query.CorrelationCteDerivedRootTest.tesCte'
+		excludeTestsMatching 'org.hibernate.orm.test.query.CteTests.testInSubquery' // Returns more than one row
+		excludeTestsMatching 'org.hibernate.orm.test.query.CteTests.testSubquery'   // emulation -> unsupported SQL construct
         excludeTestsMatching 'org.hibernate.orm.test.query.CteTests.testBasic'
         excludeTestsMatching 'org.hibernate.orm.test.query.CteTests.testBasicJoined'
         excludeTestsMatching 'org.hibernate.orm.test.query.CteTests.testMaterialized'
         excludeTestsMatching 'org.hibernate.orm.test.query.CteTests.testNested'
-        excludeTestsMatching 'org.hibernate.orm.test.jpa.query.CorrelationCteDerivedJoinTest.tesCte'
-        excludeTestsMatching 'org.hibernate.orm.test.jpa.query.CorrelationCteDerivedJoinTest.tesDerivedJoin'
         excludeTestsMatching 'org.hibernate.orm.test.query.criteria.CriteriaCteOffsetFetchTest'
         excludeTestsMatching 'org.hibernate.orm.test.query.criteria.CriteriaCteUnionTest'
+        excludeTestsMatching 'org.hibernate.orm.test.query.sqm.SelfRenderingSqmFunctionWithoutArgumentsTest.test'
         excludeTestsMatching 'org.hibernate.orm.test.subquery.MultipleIdenticalColumnsInSubqueryTest.CTE_with_same_column_selected_twice'
-        excludeTestsMatching 'org.hibernate.orm.test.jpa.query.CorrelationCteDerivedRootTest.tesCte'
 
         // IS [NOT] DISTINCT FROM not supported
-        //excludeTestsMatching 'org.hibernate.orm.test.bootstrap.binding.annotations.embedded.EmbeddedTest.testQueryWithEmbeddedParameterOneNull'
-        //excludeTestsMatching 'org.hibernate.orm.test.bootstrap.binding.annotations.embedded.EmbeddedTest.testQueryWithEmbeddedParameterAllNull' 
         excludeTestsMatching 'org.hibernate.orm.test.query.hql.DistinctFromTest.testNotDistinctFromNullParam'
         excludeTestsMatching 'org.hibernate.orm.test.query.hql.DistinctFromTest.testNotDistinctFromStringParam'
         excludeTestsMatching 'org.hibernate.orm.test.type.VarbinaryArrayTest'
@@ -441,14 +397,7 @@ test {
 
         // Subqueries in ORDER BY clause
         excludeTestsMatching 'org.hibernate.orm.test.hql.size.filter.WhereAnnotatedOneToManySizeTest.orderBy_sizeOf'
-		excludeTestsMatching 'SubqueryOperatorsTest.testSubqueryInVariousClauses'
-
-        // Multi-column value only allowed in comparison operators
-        // excludeTestsMatching 'org.hibernate.orm.test.annotations.cid.CompositeIdTest'
-        // excludeTestsMatching 'org.hibernate.orm.test.annotations.cid.HierarchicalCompositeIdLazyTest'
-        // excludeTestsMatching 'org.hibernate.orm.test.annotations.collectionelement.EmbeddableElementCollectionMemberOfTest'
-        // excludeTestsMatching 'org.hibernate.orm.test.annotations.derivedidentities.bidirectional.CompositeIdDerivedIdWithIdClassTest'
-        // excludeTestsMatching 'org.hibernate.orm.test.hql.HQLTest.test_hql_in_predicate_example_6'
+		excludeTestsMatching 'org.hibernate.orm.test.query.hql.SubqueryOperatorsTest.testSubqueryInVariousClauses'
 
         // ResultSet is forward-only
         excludeTestsMatching 'org.hibernate.orm.test.hql.ScrollableCollectionFetchingTest.testScrollingJoinFetchesEmptyResultSet'
@@ -492,6 +441,8 @@ test {
         excludeTestsMatching 'org.hibernate.orm.test.annotations.refcolnames.constraints.OneToManyRefColumnNameTest.testForeignKey'
         excludeTestsMatching 'org.hibernate.orm.test.exception.SQLExceptionConversionTest.testIntegrityViolation'
         excludeTestsMatching 'org.hibernate.orm.test.jpa.exception.ExceptionTest.testConstraintViolationException'
+        excludeTestsMatching 'org.hibernate.orm.test.constraint.ConstraintInterpretationTest.testForeignKey'
+        excludeTestsMatching 'org.hibernate.orm.test.constraint.ConstraintInterpretationTest2.testForeignKey'
 
         // Cross JOIN not supported
         excludeTestsMatching 'org.hibernate.orm.test.query.hql.JpaCrossJoinTests.test2Roots'
@@ -500,6 +451,7 @@ test {
     }
 }
 // END: For NUODB
+
 
 dependencies {
     api jakartaLibs.jpa

@@ -231,8 +231,9 @@ public class StandardFunctionTests {
 							.list();
 					session.createQuery("select abs(e.theDouble), sign(e.theDouble), sqrt(e.theDouble) from EntityOfBasics e")
 							.list();
+					// NuoDB ln() not supported
 					//session.createQuery("select exp(e.theDouble), ln(e.theDouble + 1) from EntityOfBasics e")
-					session.createQuery("select exp(e.theDouble) from EntityOfBasics e") // NuoDB ln not supported
+					session.createQuery("select exp(e.theDouble) from EntityOfBasics e")
 							.list();
 					session.createQuery("select power(e.theDouble + 1, 2.5) from EntityOfBasics e")
 							.list();
@@ -614,7 +615,7 @@ public class StandardFunctionTests {
 
 					// NUODB: START  No support for extract(WEEK)
 					if (!DialectContext.getDialect().getClass().getName().contains("nuodb"))
-						session.createQuery("select extract(week from e.theDate) from EntityOfBasics e")
+					session.createQuery("select extract(week from e.theDate) from EntityOfBasics e")
 							.list();
 					// NUODB: END
 

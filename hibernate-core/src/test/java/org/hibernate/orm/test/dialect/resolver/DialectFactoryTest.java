@@ -172,9 +172,9 @@ public class DialectFactoryTest {
 		resolver = nuoDbResolver;
 
 		if (resolver != null ) {
-				testDetermination( "NuoDB", 5, nuoDbDialectClass, resolver );
-				testDetermination( "NuoDB", 6, nuoDbDialectClass, resolver );
-				testDetermination( "NuoDB", 7, nuoDbDialectClass, resolver );
+			testDetermination( "NuoDB", 5, nuoDbDialectClass, resolver );
+			testDetermination( "NuoDB", 6, nuoDbDialectClass, resolver );
+			testDetermination( "NuoDB", 7, nuoDbDialectClass, resolver );
 		}
 		// NUODB: End
 	}

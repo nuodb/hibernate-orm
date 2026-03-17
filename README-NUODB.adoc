@@ -20,17 +20,48 @@ Hence we use _profiles_ instead.
 
 IMPORTANT: If the NuoDB Hibernate JAR version changes, edit this README and change `:jar-version:` at the top.
 
+== Summary
+
+. This branch is modified to support NuoDB.
+
+* Specifically some of the Gradle build scripts and some of the testss - see 
+<<changes-to-project>> and <<files-changed>> below.
+
+. To run the tests (see <<running-tests>> for full details):
+
+* Make sure to build and install the correct Hibernate driver - see http://github.com/nuodb/HibernateDialect6 and checkout branch `7.0`.
+The README tells you what to do.
+
+* You need a database called `hibernate_orm_test` running locally on your machine, with username and password also `hibernate_orm_test`.
+
+* Run the tests in the `hibernate-core` directory:
++
+[source%autofit,sh,subs="verbatim,attributes"]
+----
+export DIALECT_VERSION={jar-version}
+DIALECT_VERSION={jar-version} ./gradlew --rerun-tasks -Pdb=nuodb clean hibernate-core:test
+----
+
+. For additional information:
+
+* <<notes-warnings>>
+* <<using-an-ide>>
+* <<database-config>>
+* <<upgrade-dialect>>
+* <<upgrade-jdbc>>
+
+[#running-tests]
 == Running Tests
 
 To run the tests for NuoDB:
 
-. Checkout branch `nuodb/7.2`.
+. Checkout this branch, `nuodb/7.2`.
 
 . Windows users are recommended to use `git bash` or WSL rather than `CMD` or _PowerShell_.
 
 . Annoyingly, you must have Java JDK {java-version} or later installed.
-Earlier versions aren't supported by Hibernate {hibernate-version}, it requires Java {java-version} or later.
-Hibernate decided to jump eight Java releases from 7.0 to 7.2.
+Earlier versions are supported by Hibernate {hibernate-version}, but it requires Java {java-version} or later to run the Gradle build in this project.
+Hibernate decided to jump eight Java releases between 7.0 to 7.2.
 
 * For details on setting the correct JDK version, see xref:JAVA.adoc["Managing Java Versions"].
 
@@ -38,7 +69,7 @@ Hibernate decided to jump eight Java releases from 7.0 to 7.2.
 
 * Clone https://github.com/nuodb/HibernateDialect6 (yes, this project needs renaming).
 * Checkout the branch to match the branch of this project that you are using.
-** 7.0 and 7.1 require _HibernateDialect6_ branch `hib-7.0`
+** 7.0 and 7.1 require _HibernateDialect6_ branch `hib-7.0` - out of support since end 2025.
 ** 7.2 require _HibernateDialect6_ branch `hib-7.2`
 * Run `mvn -Dgpg.skip install` - see https://github.com/nuodb/HibernateDialect6#readme[project README].
 * Check the version in the POM - it will be of the form `nuodb-hibernate.NN.x.x-hib{hib-major}`
@@ -119,8 +150,8 @@ DIALECT_VERSION={jar-version} ./gradlew --rerun-tasks -Pdb=nuodb clean hibernate
 ----
 
 * After running tests:
-** _15470 tests completed, 0 failed, 2596 skipped_ (NuoDB V7.0.1)
-** _15398 tests completed, 0 failed, 2606 skipped_ (NuoDB V6.02)
+** _16204 tests completed, 0 failed, 2928 skipped_ (NuoDB V7.0.1)
+** _16143 tests completed, 0 failed, 2938 skipped_ (NuoDB V6.02)
 
 . Full details of all failing and ignored tests can be found at link:hibernate-core/target/reports/tests/test/index.html[].
 ** This directory is not populated until _after_ the test-run has finished and will be deleted by the next test run (take a copy if necessary).
@@ -164,6 +195,7 @@ test {
 
 * Many tests that will never pass, typically due to syntax and features NuoDB does not support, are already excluded in this section (the equivalent of a _black-list_).
 
+[#notes-warnings]
 == Notes and Warnings
 
 * The run will fail with an error (and run no tests) if the required database cannot be connected to.
@@ -220,6 +252,7 @@ An IDE is most useful for running individual tests that have failed and debuggin
 // gradle clean ...
 // ```
 
+[#database-config]
 == Configure the Database
 
 If required, modify properties in `gradle/databases.gradle`.
@@ -232,6 +265,7 @@ Many of the locking tests fail otherwise.
 
 * _DO NOT_ change the database name or credentials as they are used by our build system.
 
+[#upgrade-dialect]
 == Upgrade Hibernate Dialect
 
 If the Hibernate dialect has a new version number:
@@ -251,6 +285,7 @@ For the record, our Hibernate jar is referred to in:
 * `hibernate-core/hibernate-testing.gradle`
 ** References `${nuodbHibernatejar-version}`, no change needed.
 
+[#upgrade-jdbc]
 == Upgrade NuoDB JDBC Driver Version
 
 This must be changed manually in `build.gradle` where the version is set in the buildscript section:
@@ -271,6 +306,7 @@ To check the current version, run:
      grep recent build.gradle
 ```
 
+[#changes-to-project]
 == Changes Made to Project
 
 If you need to checkout a new branch for a new version of Hibernate, you will need to make the same changes again.
@@ -341,6 +377,7 @@ Mostly this is due to generating syntax or using features NuoDB SQL does not sup
 // NUODB: END
 ```
 
+[#files-changed]
 === Files Changed
 
 Output from `git status`. See also `nuodb-change-log.txt`.
@@ -386,6 +423,9 @@ Output from `git status`. See also `nuodb-change-log.txt`.
    modified:   hibernate-core/src/test/java/org/hibernate/orm/test/locking/LockRefreshTest.java
    modified:   hibernate-core/src/test/java/org/hibernate/orm/test/mapping/MappedSuperclassWithGenericsTest.java
    modified:   hibernate-core/src/test/java/org/hibernate/orm/test/mapping/basic/StringMappingTests.java
+   modified:   hibernate-core/src/test/java/org/hibernate/orm/test/query/SelectWithWrongResultTypeTest.java
+   modified:   hibernate-core/src/test/java/org/hibernate/orm/test/query/SubselectFetch2Test.java
+   modified:   hibernate-core/src/test/java/org/hibernate/orm/test/query/SubselectFetchTest.java
    modified:   hibernate-core/src/test/java/org/hibernate/orm/test/query/QueryTimeOutTest.java
    modified:   hibernate-core/src/test/java/org/hibernate/orm/test/query/hql/FunctionTests.java
    modified:   hibernate-core/src/test/java/org/hibernate/orm/test/query/hql/StandardFunctionTests.java

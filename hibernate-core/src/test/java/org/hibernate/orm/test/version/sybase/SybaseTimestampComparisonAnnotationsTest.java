@@ -12,7 +12,6 @@ import jakarta.persistence.Version;
 import org.hibernate.annotations.Generated;
 import org.hibernate.dialect.SybaseASEDialect;
 import org.hibernate.generator.EventType;
-import org.hibernate.orm.test.version.sybase.SybaseTimestampComparisonAnnotationsTest.Thing;
 import org.hibernate.testing.orm.junit.DomainModel;
 import org.hibernate.testing.orm.junit.JiraKey;
 import org.hibernate.testing.orm.junit.RequiresDialect;

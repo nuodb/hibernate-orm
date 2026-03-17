@@ -8,7 +8,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.hibernate.Hibernate;
 import org.hibernate.cfg.AvailableSettings;
-import org.hibernate.orm.test.bytecode.enhancement.lazy.LazyLoadingAndInheritanceTest.ContainedExtended;
+
 import org.hibernate.testing.bytecode.enhancement.extension.BytecodeEnhanced;
 import org.hibernate.testing.orm.junit.DomainModel;
 import org.hibernate.testing.orm.junit.JiraKey;

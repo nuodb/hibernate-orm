@@ -167,6 +167,16 @@ public class CheckNuoDBDatabaseAndVersion {
 		println('Checking a NuoDB database is available');
 		java.util.Properties props = readDatabaseFile(localDatabasesFile);
 
+		if (props.isEmpty()) {
+			props.setProperty('db.dialect', 'com.nuodb.hibernate.NuoDBDialect');
+			props.setProperty('jdbc.datasource' , 'com.nuodb.jdbc.DataSource');
+			props.setProperty('jdbc.driver', 'com.nuodb.jdbc.Driver');
+			props.setProperty('jdbc.url', ' jdbc:com.nuodb://localhost/hibernate_orm_test?isolation=read_committed&lock-wait-timeout=10');
+			props.setProperty('jdbc.user', 'hibernate_orm_test');
+			props.setProperty('jdbc.pass', 'hibernate_orm_test');
+			println("  WARNING: Unable to load properties for NuoDB database from ${localDatabasesFile}");
+		}
+
 		// Build a database URL.  All we really need is the database name.
 		String url = props.getProperty('jdbc.url');
 		int ix = url.lastIndexOf('/');

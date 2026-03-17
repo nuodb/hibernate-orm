@@ -31,7 +31,7 @@ public class VersionedCompiledCode extends AbstractCompiledCode{
 	}
 
 	@Version
-	@Column(name = "xver") // NuoDB: 'ver' is reserved word`
+	@Column(name = "verx")  // NUODB ver is a reserved word until V8
 	public Integer getVersion() {
 		return version;
 	}

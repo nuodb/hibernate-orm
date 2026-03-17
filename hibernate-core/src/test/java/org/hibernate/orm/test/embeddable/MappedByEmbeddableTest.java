@@ -5,13 +5,13 @@
 package org.hibernate.orm.test.embeddable;
 
 import jakarta.persistence.Basic;
-import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToOne;
+import jakarta.persistence.PrimaryKeyJoinColumn;
 import org.hibernate.Session;
 import org.hibernate.query.Query;
 import org.hibernate.testing.orm.junit.DomainModel;
@@ -176,7 +176,7 @@ public class MappedByEmbeddableTest {
 		private String data;
 
 		@OneToOne(mappedBy = "embed.contained")
-		@Column(name="xcontaining") // NuoDB: 'containing' reserved word
+		@PrimaryKeyJoinColumn(name="xcontaining") // NuoDB: 'containing' reserved word
 		private Containing containing;
 
 		public Integer getId() {
