@@ -27,8 +27,6 @@ import org.hibernate.dialect.PostgresPlusDialect;
 import org.hibernate.dialect.SQLServerDialect;
 import org.hibernate.dialect.SybaseASEDialect;
 import org.hibernate.dialect.SybaseDialect;
-import org.hibernate.orm.test.query.hql.FunctionTests.Pair;
-import org.hibernate.orm.test.query.hql.FunctionTests.Triple;
 import org.hibernate.community.dialect.TiDBDialect;
 import org.hibernate.query.sqm.produce.function.FunctionArgumentException;
 import org.hibernate.sql.exec.ExecutionException;
