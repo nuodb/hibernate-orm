@@ -52,7 +52,7 @@ public class EnumeratedTypeTest extends BaseNonConfigCoreFunctionalTestCase {
 		assertEquals( EnumType.class.getName(), ordinalEnum.getName() );
 
 		// string defined by Enumerated(STRING)
-		Type stringEnum = pc.getProperty( "string" ).getType();
+		Type stringEnum = pc.getProperty( "xstring" ).getType();   // NUODB
 		assertEquals( Common.class, stringEnum.getReturnedClass() );
 		assertEquals( EnumType.class.getName(), stringEnum.getName() );
 
@@ -119,16 +119,16 @@ public class EnumeratedTypeTest extends BaseNonConfigCoreFunctionalTestCase {
 		session.getTransaction().begin();
 
 		// find
-		entityEnum = (EntityEnum) session.createQuery( "from EntityEnum ee where ee.string='B1'" ).uniqueResult();
+		entityEnum = (EntityEnum) session.createQuery( "from EntityEnum ee where ee.xstring='B1'" ).uniqueResult();
 		assertEquals( id, entityEnum.getId() );
 		assertEquals( Common.B1, entityEnum.getString() );
 		// find parameter
-		entityEnum = (EntityEnum) session.createQuery( "from EntityEnum ee where ee.string=:string" )
-				.setParameter( "string", Common.B1 ).uniqueResult();
+		entityEnum = (EntityEnum) session.createQuery( "from EntityEnum ee where ee.xstring=:string" )
+				.setParameter( "string", Common.B1 ).uniqueResult();  // NUODB
 		assertEquals( id, entityEnum.getId() );
 		assertEquals( Common.B1, entityEnum.getString() );
 		// delete
-		assertEquals( 1, session.createSQLQuery( "DELETE FROM EntityEnum where string='B1'" ).executeUpdate() );
+		assertEquals( 1, session.createSQLQuery( "DELETE FROM EntityEnum where xstring='B1'" ).executeUpdate() );  // NUODB
 		session.getTransaction().commit();
 		session.close();
 
@@ -268,11 +268,11 @@ public class EnumeratedTypeTest extends BaseNonConfigCoreFunctionalTestCase {
 
 		// find
 		entityEnum = (EntityEnum) session.createCriteria( EntityEnum.class )
-				.add( Restrictions.eq( "string", Common.B2 ) ).uniqueResult();
+				.add( Restrictions.eq( "xstring", Common.B2 ) ).uniqueResult();  // NUODB
 		assertEquals( id, entityEnum.getId() );
 		assertEquals( Common.B2, entityEnum.getString() );
 		// delete
-		assertEquals( 1, session.createSQLQuery( "DELETE FROM EntityEnum where string='B2'" ).executeUpdate() );
+		assertEquals( 1, session.createSQLQuery( "DELETE FROM EntityEnum where xstring='B2'" ).executeUpdate() ); // NUODB
 
 		session.getTransaction().commit();
 		session.close();

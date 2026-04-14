@@ -102,7 +102,20 @@ public class DriverManagerConnectionProviderImpl
 	}
 
 	private static ConnectionCreator buildCreator(Map configurationValues, ServiceRegistryImplementor serviceRegistry) {
-		final String url = (String) configurationValues.get( AvailableSettings.URL );
+		/*final*/ String url = (String) configurationValues.get( AvailableSettings.URL );
+
+		// NUODB: Start - URL property sometimes gets lost, so we have saved it twice.
+		//                No idea why this happens.
+		if (url == null) {
+			url = (String) configurationValues.get( AvailableSettings.URL + '2');
+
+			try {
+				configurationValues.put( AvailableSettings.URL, url);  // Restore it
+			} catch (Exception e) {
+				// Immutable map, give up
+			}
+		}
+		// NUODB: End
 
 		String driverClassName = (String) configurationValues.get( AvailableSettings.DRIVER );
 		Driver driver = null;

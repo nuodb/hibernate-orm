@@ -1,0 +1,1725 @@
+diff --git a/README-NUODB.adoc b/README-NUODB.adoc
+index 31a6ab3c2b..da762ea1a9 100644
+--- a/README-NUODB.adoc
++++ b/README-NUODB.adoc
+@@ -1,16 +1,17 @@
+ image::https://static.jboss.org/hibernate/images/hibernate_logo_whitebkg_200px.png[]
+ 
+ :jarversion: 22.0.6-hib5
++:nuodb-dialect-project: HibernateDialect5
+ :bslash: \
+ 
+ = Hibernate and NuoDB &nbsp; &nbsp; image:https://d33wubrfki0l68.cloudfront.net/571989f106f60bced5326825bd63918a55bdf0aa/dd52a/_/img/nuodb-bird-only-green.png[width=60]
+ 
+-== 5.6 Branch
++== nuodb/5.6 Branch
+ 
+ This is a fork of Hibernate ORM (http://github.com/hibernate/hibernate-orm).
+-We have modified branches 5.6, 6.1, 6.2, 6.6 and 7.0 to allow testing of NuoDB's Hibernate dialect.
++We have modified branches 5.6, 6.1, 6.2, 6.6 7.0 and 7.2 to allow testing of NuoDB's Hibernate dialect.
+ 
+-The tests of interest are the profile tests in `hibernate-core` sub-project (which allow testing against multiple databases).
++The tests of interest are the profile tests in the `hibernate-core` sub-project (which allow testing against multiple databases).
+ Unfortunately the section on Matrix testing (in the original README) is yet to be written (since at least 2019) and presumably never will be.
+ Hence we use _profiles_.
+ 
+@@ -20,20 +21,13 @@ IMPORTANT: If the NuoDB Hibernate JAR version changes, edit this README and chan
+ 
+ To run the tests for NuoDB:
+ 
+-. Checkout branch 5.6.
++. Checkout branch `nuodb/5.6`.
+ 
+ . Windows users are recommended to use `git bash` or WSL rather than `CMD` or _PowerShell_.
+ 
+ . You must have Java JDK 8 or later installed.
+ 
+-* _Option 1:_ Install `jenv` from https://github.com/jenv/jenv to manage your JVMs.
+-** You may need to tell it which JDKs (if any) you already have installed.
+-** There is a `.java-version` file in this project, telling `jenv` to use Java 11.
+-** If necessary, use `jenv` to switch to Java 11.
+-For example, to use 8.0.43, run `jenv local 8.0.43`.
+-* _Option 2:_ use `sdkman`: https://sdkman.io
+-** `skdman` requires `git bash` or WSL on Windows.
+-** To set the same java version: `sdk use java 8.0.43`
++* For details on setting the correct JDK version, see xref:JAVA.adoc["Managing Java Versions"].
+ 
+ . Next, make sure you have our Hibernate 5 dialect jar available:
+ 
+@@ -42,11 +36,11 @@ For example, to use 8.0.43, run `jenv local 8.0.43`.
+ * Check the version in the POM - it will be of the form `nuodb-hibernate.NN.x.x-hib5`
+    * You will need to set `DIALECT_VERSION` to `NN.x.x-hib5` to match - see below.
+ 
+-. This project's gradle build file assumes you have your maven repository in
++. This project's Gradle build file assumes you have your maven repository in
+    the default location (`.m2` in your home directory).
+    If so, skip this step.
+ 
+-* Otherwise you must tell gradle where this dependency can be found.
++* Otherwise you must tell Gradle where this dependency can be found.
+ For example, suppose you use `m2` instead of `.m2`:
+ +
+ [source%autofit,sh,subs="verbatim,attributes"]
+@@ -55,13 +49,13 @@ For example, suppose you use `m2` instead of `.m2`:
+ export ADDITIONAL_REPO=~/m2/repository/com/nuodb/hibernate/nuodb-hibernate/{jarversion}
+ 
+ # Windows
+-set ADDITIONAL_REPO=c:\Users\<your-login>\.m2\repository\com\nuodb\hibernate\nuodb-hibernate{bslash}{jarversion}
++set ADDITIONAL_REPO=%HOMEPATH%\m2\repository\com\nuodb\hibernate\nuodb-hibernate{bslash}{jarversion}
+ ----
+ 
+ [start=6]
+ . Set the Hibernate dialect - this must match the Hibernate 5 dialect you installed earlier.
+ 
+-* **Note:** the value you set _should_ have `-hib5` in the end, but that's optional:
++* **Note:** the value you set _must_ have `-hib5` in the end, this is no longer optional:
+ +
+ [source%autofit,sh,subs="verbatim,attributes"]
+ ----
+@@ -69,7 +63,7 @@ export DIALECT_VERSION={jarversion}      (Linux/MacOS)
+ set DIALECT_VERSION={jarversion}         (Windows)
+ ----
+ 
+-* Alternatively, MacOS and Linux users may prepend it to any command:
++* Alternatively, `bash` shell users may prepend it to any command:
+ ** `DIALECT_VERSION={jarversion} ./gradlew ...`
+ 
+ . You _must_ be running at _least_ NuoDB V5.1.2 because tests that used to fail now pass due to enhancements in NuoDB SQL.
+@@ -78,7 +72,7 @@ set DIALECT_VERSION={jarversion}         (Windows)
+ If you do not have NuoDB installed locally, here are some options using Docker:
+ 
+ * To use `docker compose`:
+-** clone http://github.com/nuodb/nuodb-compose and (per the README):
++** clone http://github.com/nuodb/nuodb-compose and (per its `README`):
+ ** `cd nuodb` and copy `env_default` to `.env`.
+ ** Edit `.env` and set `DB_NAME`, `DB_USER` and `DB_PASSWORD` to `hibernate_orm_test`.
+ ** Also (last line) uncomment and set `EXTERNAL_ADDRESS=127.0.0.1`.
+@@ -88,7 +82,7 @@ If you do not have NuoDB installed locally, here are some options using Docker:
+ * Or, setup a local database by running `setup.sh` inside `env` folder.
+ ** This script will create a NuoDB env with an admin service, a Storage Manager (SM) and a Transaction Engine (TE) to run the tests against.
+ 
+-. For information on `gradle` refer to the original `README` content xref:README.adoc#gradle-primer[gradle-primer].
++. For information on Gradle refer to the original `README` content xref:README.adoc#gradle-primer[gradle-primer].
+ 
+ . Some tests, in particular the `ASTParserLoadingTest`, do not clean up properly and leak connections.
+ To avoid this, use `SET` or `export` to set the environment variable `HIBERNATE_CONNECTION_LEAK_DETECTION` to `TRUE`.
+@@ -117,14 +111,11 @@ DIALECT_VERSION={jarversion} ./gradlew --rerun-tasks -Pdb=nuodb clean hibernate-
+ ----
+ 
+ * After running tests:
+-** _15286 tests completed, 373 failed, 2507 skipped_ (NuoDB V7.0.1)
+-
+-. If gradle fails with _Could not find org.codehaus.groovy.modules.http-builder:http-builder:0.7.2_ you need to install it manually.
+-* The JAR is in the root directory.
+-* Run the script `install-http-builder-jar.bat` or `install-http-builder-jar.sh` to install it.
++//** _15286 tests completed, 373 failed, 2507 skipped_ (NuoDB V7.0.1)
++** _10144 tests completed, 0 failed, 1837 skipped_ (NuoDB V7.0.1)
+ 
+ . Full details of all failing and ignored tests can be found at link:hibernate-core/target/reports/tests/test/index.html[].
+-** This directory is not populated until _after_ the test-run has finished and will be deleted by the next test run (if necessary,  take a copy before running again).
++** This directory is not populated until _after_ the test-run has finished and will be deleted by the next test run (if necessary, make a copy before running again).
+ 
+ . To run individual tests, use `--tests <pattern>` on the command line.
+ * Examples (note the use of quotes when using wildcards):
+@@ -138,7 +129,7 @@ DIALECT_VERSION={jarversion} ./gradlew --rerun-tasks -Pdb=nuodb clean hibernate-
+  ... hibernate-core:test --tests '*IntegTest.singleMethod'
+ ```
+ 
+-* Note that the old _green-list_ option is not supported by the Hibernate tests from version 6.
++* Note that the old _green-list_ option is not supported by the Hibernate tests from version 6 anyway so it is no longer used here.
+ 
+ * Instead, edit `hibernate-core/hibernate-core.gradle` and find the `test.filter` section.
+ You can use the same patterns as above.
+@@ -160,7 +151,7 @@ test {
+     }
+ }
+ ```
+-** Adding an `includeTestsMatching` will cause gradle to only run the included tests, and overrides any excludes for the same tests
++** Adding an `includeTestsMatching` will cause Gradle to only run the included tests, and overrides any excludes for the same tests
+ (this is like the old _green-list_).
+ 
+ * Many tests that will never pass, typically due to syntax and features NuoDB does not support, are already listed in this section (the equivalent of a _black-list_).
+@@ -173,7 +164,7 @@ test {
+   Many tests will be skipped if they use features our dialect does not support, and that is normal.
+   We are just piggybacking on these tests for convenience.
+ 
+-* Many tests fail due to known limitations in NuoDB SQL and are marked for exclusion in  (see comments in the file).
++* Many tests fail due to known limitations in NuoDB SQL and are marked for exclusion in  (see comments in the `hibernate-core.gradle`).
+ 
+ * Two connection properties are used:
+ ** `isolation=read_committed` - this is the default for most RDBMs and tests fail using our default.
+@@ -191,14 +182,20 @@ test {
+ [#using-an-ide]
+ == Running Tests in an IDE
+ 
+-It is possible to run the tests in IntelliJ (but not currently Eclipse - it fails to load the gradle project).
++It is possible to run the tests in IntelliJ (but not currently Eclipse - it fails to load the Gradle project).
+ 
+-Open `hibernate-core` as a _gradle_ project in IntelliJ in the usual way.
++Open `hibernate-core` as a _Gradle_ project in IntelliJ in the usual way.
+ 
+ An IDE is most useful for running individual tests that have failed and debugging them.
+ 
+ * Or use the `--tests` and `includeTestsMatching` options for running a single test.
+ 
++* **FASTEST OPTION:** Copy the test into the `tests-from-hibernate-orm` directory of the corresponding branch of `{nuodb-dialect-project}`, then:
++
++** Import the project into Eclipse or IntelliJ and run test in the IDE (recommended).
++** Run the test using `mvnw ... -Dtest=...` (harder to debug).
++** Running tests via the Gradle build is very slow due to all the precompilations steps required first.
++
+ // == Testing JAR from Sonatype
+ 
+ // This involves pulling the NuoDB Hibernate JAR from Sonatype insted of your local Maven repository.
+@@ -283,7 +280,8 @@ To use NuoDB:
+ . Modified `build.gradle` in two places to look in the local maven repository (`.m2` in your home directory) for our dialect.
+ 
+ . Modified `gradle/databases.gradle` to add NuoDB and its connection properties to the `dbBundle` array.
+-The properties _must_ match those in `databases/nuodb/resources/hibernate.properties`.
++The properties _must_ match those in `databases/nuodb/resources/hibernate.properties` and
++hibernate-core/src/test/resources/hibernate.properties
+ 
+ . Modified `hibernate-testing/hibernate-testing.gradle`:
+ * To look in the local maven repository for our dialect.
+@@ -331,3 +329,48 @@ Mostly this is due to generating syntax or using features NuoDB SQL does not sup
+ ...
+ // NUODB: END
+ ```
++
++[#files-changed]
++=== Files Changed
++
++Output from `git status`. See also `nuodb-change-log.txt`.
++
++```bash
++   modified:   README-NUODB.adoc
++   modified:   build.gradle
++   modified:   databases/nuodb/matrix.gradle
++   modified:   databases/nuodb/resources/hibernate.properties
++   modified:   gradle/databases.gradle
++   modified:   gradle/published-java-module.gradle
++   modified:   gradle/publishing-repos.gradle
++   modified:   hibernate-core/hibernate-core.gradle
++   modified:   hibernate-core/src/main/java/org/hibernate/engine/jdbc/
++                  connections/internal/DriverManagerConnectionProviderImpl.java
++   modified:   hibernate-infinispan/hibernate-infinispan.gradle
++   modified:   hibernate-testing/hibernate-testing.gradle
++
++   added:      .java-version
++   added:      JAVA.adoc
++   added:      hibernate-core/src/test/java/com/TestNuoDBDialect.java
++   added:      hibernate-core/src/test/java/org/hibernate/testing/
++                  jdbc/SharedDriverManagerConnectionProviderImpl.java
++   added:      hibernate-core/src/test/java/org/hibernate/testing/junit4/BaseUnitTestCase.java
++
++   // For the Tests
++   modified:   hibernate-core/src/test/bundles/templates/defaultpar/META-INF/persistence.xml
++   modified:   hibernate-core/src/test/bundles/templates/defaultpar_1_0/META-INF/persistence.xml
++   modified:   hibernate-core/src/test/bundles/templates/excludehbmpar/META-INF/persistence.xml
++   modified:   hibernate-core/src/test/bundles/templates/explicitpar/META-INF/persistence.xml
++   modified:   hibernate-core/src/test/bundles/templates/explicitpar2/META-INF/persistence.xml
++   modified:   hibernate-core/src/test/bundles/templates/explodedpar/META-INF/persistence.xml
++   modified:   hibernate-core/src/test/bundles/templates/space par/META-INF/persistence.xml
++   modified:   hibernate-core/src/test/bundles/templates/war/WEB-INF/classes/META-INF/persistence.xml
++   modified:   hibernate-core/src/test/java/org/hibernate/jpa/test/query/NamedQueryCommentTest.java
++   modified:   hibernate-core/src/test/java/org/hibernate/test/annotations/enumerated/EntityEnum.java
++   modified:   hibernate-core/src/test/java/org/hibernate/test/annotations/enumerated/EnumeratedTypeTest.java
++   modified:   hibernate-core/src/test/java/org/hibernate/test/hql/HQLTest.java
++   modified:   hibernate-core/src/test/java/org/hibernate/test/hql/QueryTranslatorTestCase.java
++   modified:   hibernate-core/src/test/java/org/hibernate/testing/cleaner/DatabaseCleanerContext.java
++   modified:   hibernate-core/src/test/java/org/hibernate/testing/cleaner/NuoDBDatabaseCleaner.java
++   modified:   hibernate-core/src/test/resources/hibernate.properties
++```
+\ No newline at end of file
+diff --git a/build.gradle b/build.gradle
+index 4d332be9a4..db272ed269 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -6,141 +6,54 @@
+  */
+ 
+ buildscript {
++	// BEGIN: NUODB
++	// Set NuoDB JDBC JAR version
++	ext.nuodbJdbcJarVersion = "24.2.0";  // Any version will do
++	println("Using NuoDB JDBC JAR ${nuodbJdbcJarVersion}")
++	// END: NUODB
++
+ 	repositories {
+ 		jcenter()
+ 		mavenCentral()
+-
+-//        maven {
+-//            name 'jboss-snapshots'
+-//            url 'https://repository.jboss.org/nexus/content/repositories/snapshots/'
+-//        }
+-
+-        // NUODB: Look locally for our dialect JAR
+-		mavenLocal()
++		mavenLocal() // Look for NUODB JARs locally
+ 	}
+-
+ 	dependencies {
+-	    classpath 'org.codehaus.groovy.modules.http-builder:http-builder:0.7.2'
+ 		classpath 'org.hibernate.build.gradle:hibernate-matrix-testing:3.0.0.Final'
+ 		classpath 'org.hibernate.build.gradle:version-injection-plugin:1.0.0'
+ 		classpath 'gradle.plugin.com.github.lburgazzoli:gradle-karaf-plugin:0.5.1'
+ 		classpath 'org.asciidoctor:asciidoctor-gradle-jvm:3.3.2'
+ 		classpath 'de.thetaphi:forbiddenapis:3.0.1'
+-
+-        classpath 'org.hibernate.build.gradle:gradle-maven-publish-auth:2.0.1'
+-        //classpath 'org.hibernate.build.gradle:hibernate-matrix-testing:2.0.0.Final'
+-        classpath 'org.hibernate.build.gradle:gradle-xjc-plugin:1.0.2.Final'
+-        classpath 'gradle.plugin.com.github.lburgazzoli:gradle-karaf-plugin:0.1.1'
+-        //classpath 'org.asciidoctor:asciidoctor-gradle-plugin:1.5.7'
+-        classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.8.3'
+-        //classpath 'de.thetaphi:forbiddenapis:2.5'
+-
+-        // Force a later version of this JAR, 1.0.2 no longer available
+-        classpath 'nu.studer:java-ordered-properties:1.0.4'
+-
+-		// BEGIN: For NUODB V5
+-		// TODO: Hard coded release for NuoDB JDBC driver, is there better way?
+-        classpath 'com.nuodb.jdbc:nuodb-jdbc:24.1.0'
+-		classpath "com.nuodb.hibernate:nuodb-hibernate:${System.getenv('DIALECT_VERSION')}"
+-		// END
++		classpath "com.nuodb.jdbc:nuodb-jdbc:${nuodbJdbcJarVersion}" // NUODB: FOR JDBC JAR
+ 	}
+ }
+ 
+ plugins {
+ 	id 'me.champeau.buildscan-recipes' version '0.2.3'
+-	id 'io.github.gradle-nexus.publish-plugin' version '1.1.0'
+-	id 'nu.studer.credentials' version '2.2'
+ 	id 'org.hibernate.build.xjc' version '2.0.1' apply false
+-	id 'org.hibernate.build.maven-repo-auth' version '3.0.3' apply false
+ 	id 'biz.aQute.bnd' version '5.1.1' apply false
+ }
+ 
+-ext {
+-	sonatypeOssrhUser = project.findProperty( 'SONATYPE_OSSRH_USER' )
+-	sonatypeOssrhPassword = project.findProperty( 'SONATYPE_OSSRH_PASSWORD' )
+-}
+-
+-// BEGIN: For NUODB
+-// - Search local repo also
+-// - Check JAR versions and that test database is running
+-
+-repositories {
+-	mavenCentral()
+-    mavenLocal()
+-}
+-
+-// Enable debugging comments in the SQL generated by Hibernate
+-System.setProperty("ENABLE_TRACE_COMMENTS", "true");
+-
+-// Get and check NuoDB versions, check test database is running.
+-System.out.println("NuoDB Information");
+-
+-ext.checker = new CheckNuoDBDatabaseAndVersion();
+-checker.check();
+-
+-println("  Checking test database is available")
+-checker.checkDatabase('gradle/databases.gradle');
+-
+-// Save these away
+-ext.nuodbJdbcJarVersion = checker.nuodbJdbcJarVersion;
+-ext.nuodbHibernateJarVersion = checker.nuodbHibernateJarVersion;
+-ext.nuodbVersion = checker.nuodbVersion
+-ext.nuodbDatabaseVersion = checker.nuodbDatabaseVersion
+-// END: For NUODB
+-
+ File versionFile = file( "${rootProject.projectDir}/gradle/version.properties" )
+ 
+ ext {
+ 	ormVersionFile = versionFile
+ 	ormVersion = HibernateVersion.fromFile( versionFile, project )
+-
+ 	// Override during releases
+ 	if ( project.hasProperty( 'releaseVersion' ) ) {
+ 		ormVersion = new HibernateVersion( project.releaseVersion, project )
+ 	}
+-
+ 	jpaVersion = new JpaVersion('2.2')
+ 	jakartaJpaVersion = new JpaVersion('3.0.0')
+-
+-    //nuodbHibernateVersion = new NuodbHibernateVersion();
+-    //nuodbHibernateJarVersion = System.env['DIALECT_VERSION'] ?: nuodbHibernateVersion.latestVersion;
+ }
+ 
+-if (!nuodbHibernateJarVersion.endsWith('-hib5'))
+-    nuodbHibernateJarVersion += '-hib5';
+-
+-println "    Expecting to use NuoDB Hibernate JAR nuodb-hibernate-${nuodbHibernateJarVersion}.jar"
+-
+-
+ // The Gradle Nexus Publish Plugin must be applied to the root project and requires group and version
+ 
+ group = 'org.hibernate'
+ version = project.ormVersion.fullName
+ 
+-nexusPublishing {
+-	repositories {
+-		sonatype {
+-			username = project.sonatypeOssrhUser
+-			password = project.sonatypeOssrhPassword
+-		}
+-	}
+-}
+-
+ allprojects {
+ 	repositories {
+-        // NUODB: Set SONATYPE_VERSION to pull our Jar from there
+-        if (System.env['SONATYPE_VERSION'] != null) {
+-            println "hibernate-orm: Using https://oss.sonatype.org/content/repositories/comnuodb-${System.env.SONATYPE_VERSION}/com/nuodb/hibernate/nuodb-hibernate/${nuodbHibernateJarVersion}-hib5/"
+-            ivy {
+-                url "https://oss.sonatype.org/content/repositories/comnuodb-${System.env.SONATYPE_VERSION}/"
+-
+-                layout 'pattern', {
+-                    artifact '/com/nuodb/hibernate/nuodb-hibernate/${nuodbHibernateJarVersion}-hib5/nuodb-hibernate-${nuodbHibernateJarVersion}-hib5.[ext]'
+-                }
+-            }
+-        }
+ 		mavenCentral()
+-
+ 		//Allow loading additional dependencies from a local path;
+ 		//useful to load JDBC drivers which can not be distributed in public.
+ 		if (System.env['ADDITIONAL_REPO'] != null) {
+@@ -148,17 +61,7 @@ allprojects {
+ 				dirs "${System.env.ADDITIONAL_REPO}"
+ 			}
+ 		}
+-        // NuoDB: Default to adding our dialect explicitly
+-        else {
+-            flatDir {
+-		    	String mvnHome = "${System.properties.get('user.home').replace('\\', '/')}/.m2/repository";
+-		    	//println "Using default repository: ${mvnHome}"
+-                dirs "${mvnHome}/com/nuodb/hibernate/nuodb-hibernate/${nuodbHibernateJarVersion}"
+-            }
+-        }
+-        // NUODB: END
+-    }
+-
++	}
+ 	apply plugin: 'idea'
+ 
+ 	// minimize changes, at least for now (gradle uses 'build' by default)..
+@@ -168,6 +71,29 @@ allprojects {
+ 	version = project.ormVersion.fullName
+ }
+ 
++// BEGIN: For NUODB
++// - Check JAR versions and that test database is running
++// Enable debugging comments in the SQL generated by NuoDB's Dialect
++System.setProperty('ENABLE_TRACE_COMMENTS', 'true');
++
++// Get and check NuoDB versions, check test database is running.
++println('RUNNING ...')
++println  "Root project: ${project.rootProject}";
++println  "     rootDir: ${project.rootDir}"
++println  "  projectDir: ${project.projectDir}";
++println  "    user.dir: ${System.getProperty("user.dir")}";
++println  "    JDBC JAR: ${nuodbJdbcJarVersion}"
++
++CheckNuoDBDatabaseAndVersion checker = new CheckNuoDBDatabaseAndVersion();
++checker.check(nuodbJdbcJarVersion, project.projectDir);
++checker.checkDatabase(new File(project.rootDir, 'gradle/databases.gradle'));
++
++// Save these away
++ext.nuodbHibernateJarVersion = checker.nuodbHibernateJarVersion;
++ext.nuodbVersion = checker.nuodbVersion
++ext.nuodbDatabaseVersion = checker.nuodbDatabaseVersion
++// END: For NUODB
++
+ 
+ // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ // Release Task
+@@ -282,7 +208,6 @@ class HibernateVersion {
+ 	String toString() {
+ 		return this.fullName
+ 	}
+-
+ }
+ 
+ //idea {
+@@ -297,21 +222,131 @@ class HibernateVersion {
+ //    }
+ //}
+ 
+-// NUODB: START
++
++
++// BEGIN: For NUODB
++// These classes could go elsewhere, but it's easier to keep everything in the one file
++
+ /**
+- * Check versions of NuoDB database and associated JARs.
++ * Hibernate JARs not yet available, so here is a class similar to
++ * DatabaseVersion. Used in hibernate-core.gradle to include, or not,
++ * tests based on NuoDB database version.
++ */
++class SimpleDatabaseVersion {
++
++	private final int major;
++	private final int minor;
++	private final int micro;
++
++	public SimpleDatabaseVersion(int major, int minor, int micro) {
++		this.major = major;
++		this.minor = minor;
++		this.micro = micro;
++	}
++
++	public SimpleDatabaseVersion(String version) {
++		String[] bits = version.split("\\.|-");
++		this.major = Integer.parseInt(bits[0]);
++		this.minor = Integer.parseInt(bits[1]);
++		this.micro = Integer.parseInt(bits[2]);
++	}
++
++	public int major() {
++		return major;
++	}
++
++	public int minor() {
++		return minor;
++	}
++
++	public int micro() {
++		return micro;
++	}
++
++	public boolean isBefore(int major, int minor, int micro) {
++		return this.major < major || (this.major == major && (this.minor < minor || (this.minor == minor && this.micro < micro)));
++	}
++
++
++	public boolean isAfter(int major, int minor, int micro) {
++		return this.major > major || (this.major == major && (this.minor > minor || (this.minor == minor && this.micro > micro)));
++	}
++
++
++	public boolean isEqual(int major, int minor, int micro) {
++		return major == this.major && minor == this.minor && micro == this.micro;
++	}
++
++	public boolean isSameOrBefore(int major, int minor, int micro) {
++		return isEqual(major, minor, micro) || isBefore(major, minor, micro);
++	}
++
++	public boolean isSameOrAfter(int major, int minor, int micro) {
++		return isEqual(major, minor, micro) || isAfter(major, minor, micro);
++	}
++
++
++	public boolean isBefore(String version) {
++		SimpleDatabaseVersion other = new SimpleDatabaseVersion(version);
++		return isBefore(other.major(), other.minor(), other.micro());
++	}
++
++
++	public boolean isAfter(String version) {
++		SimpleDatabaseVersion other = new SimpleDatabaseVersion(version);
++		return isAfter(other.major(), other.minor(), other.micro());
++	}
++
++	public boolean isEqual(String version) {
++		SimpleDatabaseVersion other = new SimpleDatabaseVersion(version);
++		return isEqual(other.major(), other.minor(), other.micro());
++	}
++
++	public boolean isSameOrBefore(String version) {
++		SimpleDatabaseVersion other = new SimpleDatabaseVersion(version);
++		return isSameOrBefore(other.major(), other.minor(), other.micro());
++	}
++
++	public boolean isSameOrAfter(String version) {
++		SimpleDatabaseVersion other = new SimpleDatabaseVersion(version);
++		return isSameOrAfter(other.major(), other.minor(), other.micro());
++	}
++
++	@Override
++	public boolean equals(Object other) {
++		if (other instanceof SimpleDatabaseVersion) {
++			SimpleDatabaseVersion sdv = (SimpleDatabaseVersion) other;
++			return major == sdv.major && minor == sdv.minor && micro == sdv.micro;
++		}
++
++		return false;
++	}
++
++	@Override
++	public String toString() {
++		return "" + major + '.' + minor + '.' + micro;
++	}
++}
++
++/**
++ * Ensure a database is available and check versions of NuoDB database and
++ * associated JARs.
+  */
+ public class CheckNuoDBDatabaseAndVersion {
+ 
+ 	/** User home directory */
+ 	public static final String USER_HOME_PROPERTY = "user.home";
+ 
+-	public String nuodbJdbcJarVersion;
+ 	public String nuodbHibernateJarVersion;
+ 	public double nuodbVersion;
+-	public com.nuodb.hibernate.NuoDBDialectResolutionInfo nuodbDatabaseVersion;
+-
+-	public void check() {
++	public SimpleDatabaseVersion nuodbDatabaseVersion;
++
++	/**
++	 * Look for JAR dependencies - these tests take ages to compile and run. 
++	 * This code attempts to find any obvious errors up front.
++	 */
++	public void check(nuodbJdbcJarVersion, testDirectory) {
++		// Find Maven repository directory
+ 		String repoPath = System.getenv("ADDITIONAL_REPO");
+ 
+ 		if (repoPath == null)
+@@ -322,11 +357,13 @@ public class CheckNuoDBDatabaseAndVersion {
+ 		if (!repoDir.exists() || !repoDir.isDirectory())
+ 			throw new RuntimeException("Repository directory '" + repoDir + "' is not valid");
+ 
+-		File jdbcDir = new File(repoDir, "com/nuodb/jdbc/nuodb-jdbc");
+-		String nuodbJdbcJarVersion = findInDirectory(jdbcDir, null);
+-		System.out.println("  NuoDB JDBC JAR version = " + nuodbJdbcJarVersion);
+-		this.nuodbJdbcJarVersion = nuodbJdbcJarVersion;
++		// The JDBC version is set at the top of this file. Is it valid?
++		File jdbcDir = new File(repoDir, "com/nuodb/jdbc/nuodb-jdbc/${nuodbJdbcJarVersion}");
++
++		if (!jdbcDir.exists())
++			throw new RuntimeException( "No such NuoDB JDBC version ${nuodbJdbcJarVersion}");
+ 
++		// The Hibernate version should be passed from the environment. Is it valid?
+ 		File hibDir = new File(repoDir, "com/nuodb/hibernate/nuodb-hibernate");
+ 		String expectedVersion = System.getenv("DIALECT_VERSION");
+ 
+@@ -340,10 +377,46 @@ public class CheckNuoDBDatabaseAndVersion {
+ 			throw new RuntimeException(
+ 					"DIALECT_VERSION set to " + expectedVersion + ", but version not found in Maven repo");
+ 
+-		System.out.println("  NuoDB Hibernate JAR version = " + nuodbHibernateJarVersion);
++		// The changelog's first line defines the Hibernate version. Does it match the NuoDB JAR?
++		File changelogFile = new File(testDirectory, "changelog.txt");
++
++		if (!changelogFile.exists()) {
++				println("BUILD WARNING: Unable to find the project's 'changelog.txt' to confirm Hibernate version." 
++					+ " Make sure that DIALECT_VERSION is correct." )
++		}
++		else {
++			java.util.List lines = java.nio.file.Files.readAllLines(changelogFile.toPath());
++			String line1 = lines.get(0);
++			java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("Hibernate (\\d+) Changelog").matcher(line1);
++
++			if (matcher.matches()) {
++				String majorVersionFromDir = matcher.group(1);
++				println "These tests are for Hibernate " + majorVersionFromDir;
++
++				// Get the version the JAR expects
++				int ix = expectedVersion.indexOf("-hib");
++				String majorVersion = expectedVersion.substring(ix + 4);
++				println "NuoDB Hibernate JAR is for Hibernate " + majorVersion;
++
++				// They must match
++				if (!majorVersionFromDir.equals(majorVersion)) {
++					throw new RuntimeException("BUILD FAILED: 'DIALECT_VERSION' incorrect, tests are for Hibernate " //
++						+ majorVersionFromDir + " but JAR nuodb-hibernate-" + expectedVersion
++						+ " expects Hibernate " + majorVersion);
++				}
++			} else {
++				println("BUILD WARNING: Unable to determine Hibernate dialect from project's 'changelog.txt'." 
++					+ " Make sure that DIALECT_VERSION is correct." )
++			}
++		}
++
++		System.out.println("NuoDB Hibernate JAR version = " + nuodbHibernateJarVersion);
+ 		this.nuodbHibernateJarVersion = nuodbHibernateJarVersion;
+ 	}
+ 
++	/**
++	 * Look for the specified version in the Maven repository directory
++	 */
+ 	private String findInDirectory(File dir, String expectedVersion) {
+ 		String latest = "";
+ 
+@@ -363,23 +436,86 @@ public class CheckNuoDBDatabaseAndVersion {
+ 		return latest;
+ 	}
+ 
++    /**
++	 * Check we can connect to a running database and get its product version.
++	 *
++	 * @param localDatabasesFilePath Location of the gradle file containing the
++	 *                               connection details for all known databases.
++	 */
+ 	public void checkDatabase(String localDatabasesFilePath) {
++		checkDatabase(new File(localDatabasesFilePath));
++	}
+ 
+-		File localDatabasesFile = new File(localDatabasesFilePath);
++	/**
++	 * Can we connect to the database using the properties supplied? The tests
++	 * run (but fail) even if a database is not available. This forces the build
++	 * to stop.
++	 *
++	 * @param localDatabasesFile Location of the gradle file containing the connection
++	 *                           details for all known databases.
++	 */
++	public void checkDatabase(File localDatabasesFile) {
++		java.util.Properties props = readDatabaseFile(localDatabasesFile);
++
++		// Build a database URL.  All we really need is the database name.
++		String url = props.getProperty("jdbc.url");
++		int ix = url.lastIndexOf("/");
++		url = "jdbc:com.nuodb://localhost" + url.substring(ix);
++		//System.out.println("url = " + url);
+ 
++		java.util.Properties dbProps = new java.util.Properties();
++		dbProps.setProperty("url", url);
++		dbProps.setProperty("user", props.getProperty("jdbc.user"));
++		dbProps.setProperty("password", props.getProperty("jdbc.pass"));
++		//System.out.println(dbProps);
++		com.nuodb.jdbc.DataSource dataSource = new com.nuodb.jdbc.DataSource(dbProps);
++		java.sql.Connection connection = null;
++
++		// Check we can connect (database is running) and get the NuoDB version
++		try {
++			connection = dataSource.getConnection();
++			System.out.println("  Connected to database URL: " + url);
++
++			// Database version info
++			java.sql.DatabaseMetaData meta = connection.getMetaData();
++			String dbVersion = meta.getDatabaseProductVersion();
++			SimpleDatabaseVersion nuodbDatabaseVersion = new SimpleDatabaseVersion(dbVersion);
++			this.nuodbVersion = (nuodbDatabaseVersion.major() * 10000) + (nuodbDatabaseVersion.minor() * 100)
++					+ nuodbDatabaseVersion.micro();
++			this.nuodbDatabaseVersion = nuodbDatabaseVersion;
++			System.out.println("NuoDB version " + nuodbDatabaseVersion + " is available (" + nuodbVersion + ')');
++		} catch (java.sql.SQLException e) {
++			String NL = System.lineSeparator();
++			throw new RuntimeException("Failed to connect to a database - is it running?"
++			        + NL + "    URL: " + url
++					+ NL + "  ERROR: " + e.getLocalizedMessage() + " (" + e.getClass().getSimpleName() + ")");
++		} finally {
++			if (connection != null) connection.close();
++		}
++	}
++
++    /**
++	 * Check we can connect to a running database and get its product version.
++	 *
++	 * @param localDatabasesFile Location of the gradle file containing the connection
++	 *                           details for all known databases.
++	 */
++	public java.util.Properties readDatabaseFile(File localDatabasesFile) {
++		// Check file actually exists
+ 		if (!localDatabasesFile.exists())
+-			throw new RuntimeException("No such file " + localDatabasesFile);
++			throw new RuntimeException("No such file: " + localDatabasesFile.absolutePath);
+ 
+-		println("  Reading ${localDatabasesFile}")
++		// Look for the NuoDB database connection properties in the file
++		println("Reading ${localDatabasesFile}")
+ 		java.util.List<String> lines  = new ArrayList<>();
+-        java.io.BufferedReader rdr = null;
++		java.io.BufferedReader rdr = null;
+ 
+ 		try {
+-			rdr = new java.io.BufferedReader(new java.io.FileReader(localDatabasesFile));
++		    rdr = new java.io.BufferedReader(new java.io.FileReader(localDatabasesFile));
+ 			String line;
+ 
+ 			while ((line = rdr.readLine()) != null)
+-			lines.add(line);
++				lines.add(line);
+ 		} catch (java.io.IOException e) {
+ 			throw new RuntimeException("Failed to read " + localDatabasesFile + ": " + e.getLocalizedMessage() + " (" + e.getClass().getSimpleName() + ")");
+ 		} finally {
+@@ -391,14 +527,15 @@ public class CheckNuoDBDatabaseAndVersion {
+ 
+ 		for (String line : lines) {
+ 			if (!save) {
+-				if (line.contains("nuodb")) {
++				if (line.contains("nuodb")) {  // Start of NuoDB section
+ 					save = true;
+ 				}
+ 				continue;
+ 			}
+ 			else if (line.contains("]"))
+-				break; // end of nuodb section
++				break; // End of NuoDB section
+ 
++			// Extract property
+ 			line = line.replace('\'', ' ');
+ 
+ 			if (line.endsWith(","))
+@@ -414,42 +551,9 @@ public class CheckNuoDBDatabaseAndVersion {
+ 			props.setProperty(propName, propValue);
+ 		}
+ 
+-		String NL = System.lineSeparator();
+-		String propsString = props.toString();
+-		propsString = ' ' + propsString.substring(1, propsString.length())
+-		System.out.println("  JDBC properties: " + NL + '   ' + propsString.replaceAll(",", NL + '   ') + NL);
+-
+-		// Build a database URL.  We need the database name and any connection properties
+-		String url = props.getProperty("jdbc.url");
+-		int ix = url.lastIndexOf("/");
+-		url = "jdbc:com.nuodb://localhost" + url.substring(ix);
+-		//System.out.println("url = " + url);
+-
+-		java.util.Properties dbProps = new java.util.Properties();
+-		dbProps.setProperty("url", url);
+-		dbProps.setProperty("user", props.getProperty("jdbc.user"));
+-		dbProps.setProperty("password", props.getProperty("jdbc.pass"));
+-		//System.out.println(dbProps);
+-		javax.sql.DataSource dataSource = new com.nuodb.jdbc.DataSource(dbProps);
+-
+-		try {
+-			Object nuodbDatabaseVersion = new com.nuodb.hibernate.NuoDBDialectResolutionInfo(dataSource);
+-			System.out.println("  Connected to database URL: " + url);
+-
+-			// Database version info
+-			this.nuodbVersion = nuodbDatabaseVersion.getDatabaseVersionNumber();
+-			this.nuodbDatabaseVersion = nuodbDatabaseVersion;
+-			System.out.println("    NuoDB version " + nuodbDatabaseVersion + " is available (" + nuodbVersion + ')');
+-		} catch (Exception e) {
+-			String start = "\033[31;107m";
+-			String end = "\033[m";
+-
+-			throw new RuntimeException( 
+-				   start + NL + "  ERROR: Failed to connect to a database - is it running? "
+-			        + NL + "    URL: " + url
+-					+ NL + "   INFO: " + e.getLocalizedMessage() + " (" + e.getClass().getSimpleName() + ")"
+-					+ end);
+-		}
++		//System.out.println(props);
++		return props;
+ 	}
+ }
+-// // NUODB: END
+\ No newline at end of file
++// END: For NUODB
++
+diff --git a/databases/nuodb/matrix.gradle b/databases/nuodb/matrix.gradle
+index 9463412d9b..d15ee9b187 100644
+--- a/databases/nuodb/matrix.gradle
++++ b/databases/nuodb/matrix.gradle
+@@ -5,23 +5,6 @@
+  * See the lgpl.txt file in the root directory or <http://www.gnu.org/licenses/lgpl-2.1.html>.
+  */
+ 
+-/*
+-if (System.env['DIALECT_VERSION'] == null) {
+-    println("matrix.gradle: DIALECT_VERSION environment variable should be set to 20.0.0 or later")
+-    
+-    if (nuodbHibernateVersion.isUnknown()) {
+-        println()
+-        println(">> ERROR: Unknown Dialect JAR version, unable to continue")
+-        println()
+-        System.exit(-1);
+-    }
+-        
+-    println("    Defaulting to ${nuodbHibernateVersion.latestVersion}")
+-}
+-
+-ext.nuodbHibernateJarVersion = System.env['DIALECT_VERSION'] ?: nuodbHibernateVersion.latestVersion;
+-*/
+-
+ // Sanity check.  Makes sure these are set (in the project's modified build.xml)
+ println "matrix.gradle: NuoDB JDBC JAR version=${nuodbJdbcJarVersion}";
+ println "matrix.gradle: NuoDB Hibernate JAR version=${nuodbHibernateJarVersion}";
+diff --git a/databases/nuodb/resources/hibernate.properties b/databases/nuodb/resources/hibernate.properties
+index 45709e9e10..d3c9a60455 100644
+--- a/databases/nuodb/resources/hibernate.properties
++++ b/databases/nuodb/resources/hibernate.properties
+@@ -1,21 +1,42 @@
+ #
+-# Hibernate, Relational Persistence for Idiomatic Java (NuoDB Matrix Test 5.6 OLD)
++# Hibernate, Relational Persistence for Idiomatic Java (NuoDB Tests 5.6)
+ # -- Keep this in sync with hibernate-core/src/test/resources/hibernate.properties
++# -- And with the 'nuodb' section of 'gradle/databases.gradle'
+ #
+ # License: GNU Lesser General Public License (LGPL), version 2.1 or later.
+ # See the lgpl.txt file in the root directory or <http://www.gnu.org/licenses/lgpl-2.1.html>.
+ #
+ 
+-# Force a lock-wait so tests don't run forever
+-hibernate.connection.url jdbc:com.nuodb.hib://localhost/hibernate_orm_test?isolation=read_committed&lock-wait-timeout=10
++# Now we are using the profile option, -Pdb=nuodb, this file is not the one used. I think
++# this file is only needed for matrix testing.
++# Just to be sure, keep it the same as hibernate-core/src/test/resources/hibernate.properties
++
++# Hibernate's tests use the now deprecated Dialect.getDialect() to get a
++# Dialect instance, requiring the 'hibernate.dialect' property to be set,
++# ignoring the new dialect resolver. Unfortunately this uses the dialect's
++# default constructor so the instance does not know the version of the
++# underlying database. TestNuoDBDialect also has a default constructor but
++# uses JDBC meta-data to lookup the database version information.
++hibernate.dialect com.nuodb.hibernate.TestNuoDBDialect
+ 
+ hibernate.connection.driver_class com.nuodb.hibernate.NuoHibernateDriver
+-hibernate.dialect com.nuodb.hibernate.NuoDBDialect
++# Force a lock-wait so tests don't run forever
++hibernate.connection.url jdbc:com.nuodb.hib://localhost/hibernate_orm_test?jdk14Logger=true&isolation=read_committed&lock-wait-timeout=30
+ hibernate.connection.username hibernate_orm_test
+ hibernate.connection.password hibernate_orm_test
+-hibernate.connection.schema   DBO
+-	
+-hibernate.connection.pool_size 5
++#hibernate.connection.schema   DBO
++
++# EXTRA Save URL twice, no idea why the URL property sometimes gets lost, this is a "spare"!
++hibernate.connection.url2 jdbc:com.nuodb.hib://localhost/hibernate_orm_test?jdk14Logger=true&isolation=read_committed&lock-wait-timeout=30
++
++# EXTRA: Added the equivalent JPA properties
++javax.persistence.jdbc.driver com.nuodb.hibernate.NuoHibernateDriver
++javax.persistence.jdbc.url jdbc:com.nuodb.hib://localhost/hibernate_orm_test?jdk14Logger=true&isolation=read_committed&lock-wait-timeout=30
++javax.persistence.jdbc.user hibernate_orm_test
++javax.persistence.jdbc.password hibernate_orm_test
++
++hibernate.connection.initial_pool_size 16
++hibernate.connection.pool_size 16
+ 
+ hibernate.show_sql false
+ hibernate.format_sql true
+@@ -25,19 +46,15 @@ hibernate.max_fetch_depth 5
+ hibernate.cache.region_prefix hibernate.test
+ hibernate.cache.region.factory_class org.hibernate.testing.cache.CachingRegionFactory
+ 
++javax.persistence.validation.mode=NONE
+ hibernate.service.allow_crawling=false
+ hibernate.session.events.log=true
+ 
+ hibernate.hql.bulk_id_strategy.global_temporary.drop_tables=true
++hibernate.connection.isolation=READ_COMMITTED
+ 
+ # DIALECT RESOLUTION ... Enable use of NuoDB Dialect resolver
++
++# Enable use of NuoDB Dialect resolver - do any tests actually use this?
+ hibernate.dialect_resolvers=com.nuodb.hibernate.NuoDbDialectResolver
+ hibernate.temp.use_jdbc_metadata_defaults=true
+-
+-# Reduce lock time out to 30s from 30 mins
+-# ... Not convinced these do anything useful
+-hibernate.pooling.idleTimeout=30
+-
+-javax.persistence.lock.timeout=40
+-javax.persistence.query.timeout=50
+-javax.persistence.validation.mode=NONE
+diff --git a/gradle/databases.gradle b/gradle/databases.gradle
+index 40ac4666cb..0e822715df 100644
+--- a/gradle/databases.gradle
++++ b/gradle/databases.gradle
+@@ -34,12 +34,19 @@ ext {
+                         'jdbc.url'   : 'jdbc:derby:target/tmp/derby/hibernate_orm_test;databaseName=hibernate_orm_test;create=true',
+                         'connection.init_sql' : ''
+                 ],
++                // NUODB
+                 nuodb : [
+-                        'db.dialect' : 'com.nuodb.hibernate.nuodb-hibernate.NuoDBDialect',
+-                        'jdbc.driver': 'com.nuodb.jdbc.Driver',
++                        'db.dialect' : 'com.nuodb.hibernate.TestNuoDBDialect',
++                        'jdbc.driver': 'com.nuodb.hibernate.NuoHibernateDriver',
+                         'jdbc.user'  : 'hibernate_orm_test',
+                         'jdbc.pass'  : 'hibernate_orm_test',
+-                        'jdbc.url'   : 'jdbc:com.nuodb.hib://localhost/hibernate_orm_test?isolation=read_committed&lock-wait-timeout=10'
++                        'connection.init_sql' : '',
++                        // Ensure READ_COMMITTED is default isolation (like other RDBMSs) and reduce lock-wait time so failed tests fail more quickly
++                        'jdbc.url'   : 'jdbc:com.nuodb.hib://' + dbHost + '/hibernate_orm_test?isolation=read_committed&lock-wait-timeout=10',
++                        // Same URL but with an ampersand entity for substitution in persistence.xml files
++                        'jdbc.url2'   : 'jdbc:com.nuodb.hib://' + dbHost + '/hibernate_orm_test?isolation=read_committed&amp;lock-wait-timeout=10',
++                        'jdbc.datasource' : 'com.nuodb.jdbc.DataSource',
++                        'slf4jLogger' : 'false'
+                 ],
+                 pgsql : [
+                         'db.dialect' : 'org.hibernate.dialect.PostgreSQL95Dialect',
+diff --git a/gradle/published-java-module.gradle b/gradle/published-java-module.gradle
+index df0fd448b2..58201f9037 100644
+--- a/gradle/published-java-module.gradle
++++ b/gradle/published-java-module.gradle
+@@ -165,6 +165,8 @@ publishing {
+ 
+ task ciBuild( dependsOn: [test, publish] )
+ 
+-task release( dependsOn: [test, publishToSonatype] )
+-publishToSonatype.mustRunAfter test
++task releasePrepare( dependsOn: [publishAllPublicationsToStagingRepository] ) {
++    group = "Release"
++    description = "Performs a release: the hibernate version is set and the changelog.txt file updated, the changes are pushed to github, then the release is performed, tagged and the hibernate version is set to the development one."
++}
+ 
+diff --git a/gradle/publishing-repos.gradle b/gradle/publishing-repos.gradle
+index b417e1eba3..e6138c4ab9 100644
+--- a/gradle/publishing-repos.gradle
++++ b/gradle/publishing-repos.gradle
+@@ -6,11 +6,8 @@
+  */
+ 
+ apply plugin: 'maven-publish'
+-if ( rootProject.ormVersion.isSnapshot ) {
+-	apply plugin: 'org.hibernate.build.maven-repo-auth'
+-}
+ 
+-publishing {
++/*publishing {
+ 	publications {
+ 		publishedArtifacts( MavenPublication )
+ 	}
+@@ -21,6 +18,25 @@ publishing {
+ 			url 'https://repository.jboss.org/nexus/content/repositories/snapshots'
+ 		}
+ 	}
++}*/
++
++publishing {
++	publications {
++		publishedArtifacts( MavenPublication )
++	}
++	repositories {
++		maven {
++			name = "staging"
++			url = rootProject.layout.buildDirectory.dir("staging-deploy${File.separator}maven")
++		}
++		maven {
++			name = 'snapshots'
++			url = "https://central.sonatype.com/repository/maven-snapshots/"
++			// So that Gradle uses the `ORG_GRADLE_PROJECT_snapshotsPassword` / `ORG_GRADLE_PROJECT_snapshotsUsername`
++			//  env variables to read the username/password for the `snapshots` repository publishing:
++			credentials(PasswordCredentials)
++		}
++	}
+ }
+ 
+ model {
+diff --git a/hibernate-core/hibernate-core.gradle b/hibernate-core/hibernate-core.gradle
+index 156ba9713a..27bd87c766 100644
+--- a/hibernate-core/hibernate-core.gradle
++++ b/hibernate-core/hibernate-core.gradle
+@@ -4,6 +4,7 @@
+  * License: GNU Lesser General Public License (LGPL), version 2.1 or later.
+  * See the lgpl.txt file in the root directory or <http://www.gnu.org/licenses/lgpl-2.1.html>.
+  */
++ // HIBERNATE 5.6
+ import org.apache.tools.ant.filters.ReplaceTokens
+ import org.gradle.api.tasks.testing.TestResult.ResultType
+ 
+@@ -11,11 +12,11 @@ import org.gradle.api.tasks.testing.TestResult.ResultType
+ // Can't think of a way to make this generic, but we only test NuoDB
+ buildscript {
+     repositories {
+-        mavenLocal()
++        mavenLocal()  // For NUODB JARs
+         mavenCentral()
+     }
+     dependencies {
+-        classpath 'com.nuodb.jdbc:nuodb-jdbc:${nuodbJdbcJarVersion}'
++        classpath "com.nuodb.jdbc:nuodb-jdbc:${nuodbJdbcJarVersion}"
+         classpath "com.nuodb.hibernate:nuodb-hibernate:${nuodbHibernateJarVersion}"
+     }
+ }
+@@ -63,19 +64,157 @@ repositories {
+     mavenLocal()
+ }
+ 
++// --------------------------------------------------------------------- //
++// -         Control which tests are included or excluded 6.2          - //
++// --------------------------------------------------------------------- //
+ test {
+     filter {
+-        // --------------------------------------------
++        // ---------------------------------------------------------------------
+         // Tests modified for NuoDB differences
+-        // --------------------------------------------
++        // ---------------------------------------------------------------------
+         // NuoDB has a slightly different error message
+-        // org.hibernate.orm.test.batch.BatchOptimisticLockingTest.testBatchAndOptimisticLocking
++        //   org.hibernate.orm.test.batch.BatchOptimisticLockingTest.testBatchAndOptimisticLocking
++        // No space before + in NuoDB query hints
++        //   org.hibernate.jpa.test.query.NamedQueryCommentTest
++        // Expects trunc(x) but we replace trunc() by floor().
++        //   org.hibernate.test.hql.HQLTest.testGroupByFunction
+ 
+         // ---------------------------------------------------------------------
+         // Failing tests that need fixing?
+         // ---------------------------------------------------------------------
++
++        // excludeTestsMatching 'org.hibernate.test.a*'
++        // excludeTestsMatching 'org.hibernate.test.b*'
++        // excludeTestsMatching 'org.hibernate.test.c*'
++        // excludeTestsMatching 'org.hibernate.test.d*'
++        // excludeTestsMatching 'org.hibernate.test.e*'
++        // excludeTestsMatching 'org.hibernate.test.f*'
++        // excludeTestsMatching 'org.hibernate.test.g*'
++        // excludeTestsMatching 'org.hibernate.test.h*'
++        // excludeTestsMatching 'org.hibernate.test.i*'
++        // excludeTestsMatching 'org.hibernate.test.j*'
++        // excludeTestsMatching 'org.hibernate.test.l*'
++        // excludeTestsMatching 'org.hibernate.test.m*'
++        // excludeTestsMatching 'org.hibernate.test.n*'
++        // excludeTestsMatching 'org.hibernate.test.o*'
++        // excludeTestsMatching 'org.hibernate.test.p*'
++        // excludeTestsMatching 'org.hibernate.test.q*'
++        // excludeTestsMatching 'org.hibernate.test.r*'
++        // excludeTestsMatching 'org.hibernate.test.s*'
++        // excludeTestsMatching 'org.hibernate.test.t*'
++        // excludeTestsMatching 'org.hibernate.test.u*'
++        // excludeTestsMatching 'org.hibernate.test.v*'
++        // excludeTestsMatching 'org.hibernate.test.w*'
++
+         // Undefined reference to DESCRIPTION
+-        excludeTestsMatching 'org.hibernate.orm.test.hql.BulkManipulationTest'
++        // Too few values specified in the value list
++        excludeTestsMatching 'org.hibernate.test.hql.BulkManipulationTest'
++
++        // Runs fine manually
++        excludeTestsMatching 'org.hibernate.jpa.test.lock.LockTest.testContendedPessimisticLock'
++        excludeTestsMatching 'org.hibernate.test.typedescriptor.ByteTest.testByteDataPersistenceAndRetrieval'
++
++        // expected:<x> but was:<y>
++        excludeTestsMatching 'org.hibernate.test.hql.NaturalIdDereferenceTest.doNotDereferenceNaturalIdIfIsReferenceToPrimaryKey'
++        excludeTestsMatching 'org.hibernate.test.hql.NaturalIdDereferenceTest.naturalIdDereferenceFromImplicitJoin'
++        excludeTestsMatching 'org.hibernate.test.hql.NaturalIdDereferenceTest.naturalIdDereferenceTest'
++        excludeTestsMatching 'org.hibernate.test.hql.NaturalIdDereferenceTest.nestedNaturalIdDereferenceFromImplicitJoin2'
++        excludeTestsMatching 'org.hibernate.test.hql.NaturalIdDereferenceTest.normalIdDereferenceFromImplicitJoin'
++        excludeTestsMatching 'org.hibernate.test.hql.NaturalIdDereferenceTest.selectedEntityIsNotDereferencedForPrimaryKey'
++
++        excludeTestsMatching 'org.hibernate.test.cascade.circle.identity.CascadeCircleIdentityIdTest.testCascade'
++            // org.junit.runners.model.TestTimedOutException at CascadeCircleIdentityIdTest.java:61
++        excludeTestsMatching 'org.hibernate.test.annotations.cascade.multicircle.jpa.identity.MultiCircleJpaCascadeIdentityTest.testMerge'
++            // org.junit.runners.model.TestTimedOutException at MultiCircleJpaCascadeIdentityTest.java:164
++        excludeTestsMatching 'org.hibernate.test.annotations.cascade.multicircle.jpa.identity.MultiCircleJpaCascadeIdentityTest.testPersist'
++            // org.junit.runners.model.TestTimedOutException at MultiCircleJpaCascadeIdentityTest.java:153
++        excludeTestsMatching 'org.hibernate.test.annotations.cascade.multicircle.jpa.sequence.MultiCircleJpaCascadeSequenceTest.*' // 2/3 tests fail
++
++        // Undefined table TOOL - 3/3 tests fail
++        excludeTestsMatching 'org.hibernate.jpa.test.criteria.idclass.IdClassPredicateTest'
++
++        // PreparedStatement is NOT closed
++        excludeTestsMatching 'org.hibernate.jpa.test.lock.StatementIsClosedAfterALockExceptionTest.testStatementIsClosed'
++
++        // unable to convert string "Jane Smith" into number
++        excludeTestsMatching 'org.hibernate.test.inheritance.TransientOverrideAsPersistentJoined.testFindByRootClass'
++        excludeTestsMatching 'org.hibernate.test.inheritance.TransientOverrideAsPersistentJoined.testFindBySubclass'
++        excludeTestsMatching 'org.hibernate.test.inheritance.TransientOverrideAsPersistentJoined.testQueryByRootClass'
++        excludeTestsMatching 'org.hibernate.test.inheritance.TransientOverrideAsPersistentJoined.testQueryBySublassAndOverridenProperty'
++        excludeTestsMatching 'org.hibernate.test.inheritance.TransientOverrideAsPersistentTablePerClass'
++
++        // Problems with Date and Time types
++        excludeTestsMatching 'org.hibernate.test.type.LocalDateTest'
++        excludeTestsMatching 'org.hibernate.test.temporal.TimePropertyTest.testTimeAsDate'
++        excludeTestsMatching 'org.hibernate.test.timestamp.JdbcTimeCustomTimeZoneTest.testTimeZone'
++        excludeTestsMatching 'org.hibernate.test.timestamp.JdbcTimestampCustomSessionLevelTimeZoneTest.testTimeZone'
++        excludeTestsMatching 'org.hibernate.test.timestamp.JdbcTimestampCustomTimeZoneTest.testTimeZone'
++
++        // Schema issues?
++        excludeTestsMatching 'org.hibernate.test.schemaupdate.SchemaUpdateTest'
++
++        // ---------------------------------------------------------------------
++        // Tests to skip due to known NuoDB limitations
++        // ---------------------------------------------------------------------
++
++        // Does the NuoDB JDBC JAR support NClob, NString ... ?
++        if (nuodbJdbcJarVersion.compareTo('24.2.2') < 0) {  // Supported from 24.2.2
++            println 'hibernate-core.gradle: Excluding tests of Nationalized columns'
++            excludeTestsMatching 'org.hibernate.test.criterion.NationalizedIgnoreCaseTest.testIgnoreCaseCriteria'
++            excludeTestsMatching 'org.hibernate.orm.test.type.LobUnfetchedPropertyTest.testNClob'
++            excludeTestsMatching 'org.hibernate.test.nationalized.NationalizedLobFieldTest.testNationalization'
++            excludeTestsMatching 'org.hibernate.test.type.LobUnfetchedPropertyTest.testNClob'
++        } else {
++            println 'hibernate-core.gradle: Including tests of Nationalized columns'
++        }
++
++        if (nuodbHibernateJarVersion.compareTo('7.0.0') < 0) {
++            println 'hibernate-core.gradle: Excluding tests using NuoDB 7 features'
++        } else {
++            println 'hibernate-core.gradle: Running tests using NuoDB 7 features'
++        }
++        
++        // NuoDB does not use Catalogs
++        excludeTestsMatching 'org.hibernate.test.boot.database.qualifiedTableNaming.DefaultCatalogAndSchemaTest'
++
++        // all() not supported
++        excludeTestsMatching 'org.hibernate.jpa.test.criteria.subquery.UncorrelatedSubqueryTest.testEqualAll'
++
++        // ResultSets are forward only
++        excludeTestsMatching 'org.hibernate.jpa.test.criteria.fetchscroll.CriteriaToScrollableResultsFetchTest.testWithScroll'
++        excludeTestsMatching 'org.hibernate.test.criteria.SessionCreateQueryFromCriteriaTest.testScrollMethod'
++        excludeTestsMatching 'org.hibernate.test.hql.ScrollableCollectionFetchingTest.testScrollingJoinFetchesEmptyResultSet' // Before start of result set
++        excludeTestsMatching 'org.hibernate.test.hql.ScrollableCollectionFetchingTest.testScrollingJoinFetchesPositioning'
++        excludeTestsMatching 'org.hibernate.test.hql.ScrollableCollectionFetchingTest.testScrollingJoinFetchesReverse'
++        excludeTestsMatching 'org.hibernate.test.hql.ScrollableCollectionFetchingTest.testScrollingJoinFetchesSingleRowResultSet'
++        excludeTestsMatching 'org.hibernate.test.resulttransformer.ResultTransformerTest.testResultTransformerIsAppliedToScrollableResults'
++
++        // Constraints not enforced
++        excludeTestsMatching 'org.hibernate.jpa.test.exception.ExceptionTest.testConstraintViolationException'
++        excludeTestsMatching 'org.hibernate.test.exception.SQLExceptionConversionTest.testIntegrityViolation' // INSERT should have failed
++
++        // Referencial integrity not enforced
++        excludeTestsMatching 'org.hibernate.test.manytomany.ManyToManyBidirectionalTest'
++
++        //excludeTestsMatching 'org.hibernate.jpa.test.lock.LockTest.testContendedPessimisticLock'
++
++        // SQL: '... where (x,y) IN ...' is not supported
++        excludeTestsMatching 'org.hibernate.query.hhh14156.HHH14156Test'
++
++        // multi-column value only allowed in comparison operators
++        excludeTestsMatching 'org.hibernate.test.subselect.CompositeIdTypeBindingTest'
++
++        // subqueries are not allowed in the ORDER BY clause
++        excludeTestsMatching 'org.hibernate.test.hql.size.filter.WhereAnnotatedOneToManySizeTest.orderBy_dotSize'
++        excludeTestsMatching 'org.hibernate.test.hql.size.filter.WhereAnnotatedOneToManySizeTest.orderBy_sizeOf'
++
++        // Dependent Right Outer Join not supported
++        excludeTestsMatching 'org.hibernate.test.join.OuterJoinTest.testJoinOrderWithRightJoinWithInnerImplicitJoins'
++
++        // some(SELECT ...) not supported?  SOME() is equivalent to ANY()
++        excludeTestsMatching 'org.hibernate.test.legacy.FooBarTest.testPersistCollections'
++        excludeTestsMatching 'org.hibernate.test.legacy.FooBarTest.testQuery'
++        excludeTestsMatching 'org.hibernate.test.legacy.SQLFunctionsTest.testSQLFunctions'
+     }
+ }
+ 
+@@ -90,8 +229,10 @@ dependencies {
+     compile( libraries.classmate )
+     compile( libraries.activation )
+ 
++    // NUODB: BEGIN
+     compile( "com.nuodb.jdbc:nuodb-jdbc:${nuodbJdbcJarVersion}" )
+     compile( "com.nuodb.hibernate:nuodb-hibernate:${nuodbHibernateJarVersion}" )
++    // NUODB: END
+     
+     // We need dom4j for a number of things temporarily:
+     //      1) (unsupported) EntityMode.DOM4J support
+@@ -146,8 +287,10 @@ dependencies {
+     testRuntimeOnly( libraries.atomikos_jta )
+     testRuntimeOnly( libraries.wildfly_transaction_client )
+ 
++    // NUODB: BEGIN
+     testRuntimeOnly( "com.nuodb.hibernate:nuodb-hibernate:${nuodbHibernateJarVersion}" )
+-    testRuntimeOnly( "com.nuodb.jdbc:nuodb-jdbc:24.1.0" )
++    testRuntimeOnly( "com.nuodb.jdbc:nuodb-jdbc:${nuodbJdbcJarVersion}" )
++    // NUODB: END
+ 
+     testAnnotationProcessor( project( ':hibernate-jpamodelgen' ) )
+ 
+diff --git a/hibernate-core/src/main/java/org/hibernate/engine/jdbc/connections/internal/DriverManagerConnectionProviderImpl.java b/hibernate-core/src/main/java/org/hibernate/engine/jdbc/connections/internal/DriverManagerConnectionProviderImpl.java
+index 7201b7e689..c61ae6135a 100644
+--- a/hibernate-core/src/main/java/org/hibernate/engine/jdbc/connections/internal/DriverManagerConnectionProviderImpl.java
++++ b/hibernate-core/src/main/java/org/hibernate/engine/jdbc/connections/internal/DriverManagerConnectionProviderImpl.java
+@@ -102,7 +102,20 @@ public class DriverManagerConnectionProviderImpl
+ 	}
+ 
+ 	private static ConnectionCreator buildCreator(Map configurationValues, ServiceRegistryImplementor serviceRegistry) {
+-		final String url = (String) configurationValues.get( AvailableSettings.URL );
++		/*final*/ String url = (String) configurationValues.get( AvailableSettings.URL );
++
++		// NUODB: Start - URL property sometimes gets lost, so we have saved it twice.
++		//                No idea why this happens.
++		if (url == null) {
++			url = (String) configurationValues.get( AvailableSettings.URL + '2');
++
++			try {
++				configurationValues.put( AvailableSettings.URL, url);  // Restore it
++			} catch (Exception e) {
++				// Immutable map, give up
++			}
++		}
++		// NUODB: End
+ 
+ 		String driverClassName = (String) configurationValues.get( AvailableSettings.DRIVER );
+ 		Driver driver = null;
+diff --git a/hibernate-core/src/test/bundles/templates/defaultpar/META-INF/persistence.xml b/hibernate-core/src/test/bundles/templates/defaultpar/META-INF/persistence.xml
+index 72ae3cdd59..8bd810a108 100644
+--- a/hibernate-core/src/test/bundles/templates/defaultpar/META-INF/persistence.xml
++++ b/hibernate-core/src/test/bundles/templates/defaultpar/META-INF/persistence.xml
+@@ -19,7 +19,7 @@
+             <property name="hibernate.connection.driver_class" value="@jdbc.driver@"/>
+             <property name="hibernate.connection.username" value="@jdbc.user@"/>
+             <property name="hibernate.connection.password" value="@jdbc.pass@"/>
+-            <property name="hibernate.connection.url" value="@jdbc.url@"/>
++            <property name="hibernate.connection.url" value="@jdbc.url2@"/>
+             <property name="hibernate.connection.init_sql" value="@connection.init_sql@"/>
+             <property name="hibernate.hbm2ddl.auto" value="create-drop"/>
+             <property name="hibernate.cache.region.factory_class" value="org.hibernate.testing.cache.CachingRegionFactory" />
+diff --git a/hibernate-core/src/test/bundles/templates/defaultpar_1_0/META-INF/persistence.xml b/hibernate-core/src/test/bundles/templates/defaultpar_1_0/META-INF/persistence.xml
+index c754da627e..99a51c6d06 100644
+--- a/hibernate-core/src/test/bundles/templates/defaultpar_1_0/META-INF/persistence.xml
++++ b/hibernate-core/src/test/bundles/templates/defaultpar_1_0/META-INF/persistence.xml
+@@ -18,7 +18,7 @@
+             <property name="hibernate.connection.driver_class" value="@jdbc.driver@"/>
+             <property name="hibernate.connection.username" value="@jdbc.user@"/>
+             <property name="hibernate.connection.password" value="@jdbc.pass@"/>
+-            <property name="hibernate.connection.url" value="@jdbc.url@"/>
++            <property name="hibernate.connection.url" value="@jdbc.url2@"/>
+             <property name="hibernate.connection.init_sql" value="@connection.init_sql@"/>
+             <property name="hibernate.hbm2ddl.auto" value="create-drop"/>
+ 			<property name="hibernate.cache.region.factory_class" value="org.hibernate.testing.cache.CachingRegionFactory" />
+diff --git a/hibernate-core/src/test/bundles/templates/excludehbmpar/META-INF/persistence.xml b/hibernate-core/src/test/bundles/templates/excludehbmpar/META-INF/persistence.xml
+index a7773844b6..44b7226898 100644
+--- a/hibernate-core/src/test/bundles/templates/excludehbmpar/META-INF/persistence.xml
++++ b/hibernate-core/src/test/bundles/templates/excludehbmpar/META-INF/persistence.xml
+@@ -18,7 +18,7 @@
+             <property name="hibernate.connection.driver_class" value="@jdbc.driver@"/>
+             <property name="hibernate.connection.username" value="@jdbc.user@"/>
+             <property name="hibernate.connection.password" value="@jdbc.pass@"/>
+-            <property name="hibernate.connection.url" value="@jdbc.url@"/>
++            <property name="hibernate.connection.url" value="@jdbc.url2@"/>
+             <property name="hibernate.connection.init_sql" value="@connection.init_sql@"/>
+             <property name="hibernate.hbm2ddl.auto" value="create-drop"/>
+ 			<property name="hibernate.cache.region.factory_class" value="org.hibernate.testing.cache.CachingRegionFactory" />
+diff --git a/hibernate-core/src/test/bundles/templates/explicitpar/META-INF/persistence.xml b/hibernate-core/src/test/bundles/templates/explicitpar/META-INF/persistence.xml
+index 8512f8ea15..fab2495d6b 100644
+--- a/hibernate-core/src/test/bundles/templates/explicitpar/META-INF/persistence.xml
++++ b/hibernate-core/src/test/bundles/templates/explicitpar/META-INF/persistence.xml
+@@ -24,7 +24,7 @@
+             <property name="hibernate.connection.driver_class" value="@jdbc.driver@"/>
+             <property name="hibernate.connection.username" value="@jdbc.user@"/>
+             <property name="hibernate.connection.password" value="@jdbc.pass@"/>
+-            <property name="hibernate.connection.url" value="@jdbc.url@"/>
++            <property name="hibernate.connection.url" value="@jdbc.url2@"/>
+             <property name="hibernate.connection.init_sql" value="@connection.init_sql@"/>
+             <property name="hibernate.cache.use_query_cache" value="true"/>
+             <property name="hibernate.cache.region_prefix" value="hibernate.test"/>
+diff --git a/hibernate-core/src/test/bundles/templates/explicitpar2/META-INF/persistence.xml b/hibernate-core/src/test/bundles/templates/explicitpar2/META-INF/persistence.xml
+index 6763c7d9d2..ed19099635 100644
+--- a/hibernate-core/src/test/bundles/templates/explicitpar2/META-INF/persistence.xml
++++ b/hibernate-core/src/test/bundles/templates/explicitpar2/META-INF/persistence.xml
+@@ -27,7 +27,7 @@
+             <property name="hibernate.connection.driver_class" value="@jdbc.driver@"/>
+             <property name="hibernate.connection.username" value="@jdbc.user@"/>
+             <property name="hibernate.connection.password" value="@jdbc.pass@"/>
+-            <property name="hibernate.connection.url" value="@jdbc.url@"/>
++            <property name="hibernate.connection.url" value="@jdbc.url2@"/>
+             <property name="hibernate.connection.init_sql" value="@connection.init_sql@"/>
+             <property name="hibernate.cache.use_query_cache" value="true"/>
+             <property name="hibernate.cache.region_prefix" value="hibernate.test"/>
+diff --git a/hibernate-core/src/test/bundles/templates/explodedpar/META-INF/persistence.xml b/hibernate-core/src/test/bundles/templates/explodedpar/META-INF/persistence.xml
+index 8a2291d6a9..457cbc3134 100644
+--- a/hibernate-core/src/test/bundles/templates/explodedpar/META-INF/persistence.xml
++++ b/hibernate-core/src/test/bundles/templates/explodedpar/META-INF/persistence.xml
+@@ -17,7 +17,7 @@
+             <property name="hibernate.connection.driver_class" value="@jdbc.driver@"/>
+             <property name="hibernate.connection.username" value="@jdbc.user@"/>
+             <property name="hibernate.connection.password" value="@jdbc.pass@"/>
+-            <property name="hibernate.connection.url" value="@jdbc.url@"/>
++            <property name="hibernate.connection.url" value="@jdbc.url2@"/>
+             <property name="hibernate.connection.init_sql" value="@connection.init_sql@"/>
+             <property name="hibernate.hbm2ddl.auto" value="create-drop"/>
+ 			<property name="hibernate.cache.region.factory_class" value="org.hibernate.testing.cache.CachingRegionFactory" />
+diff --git a/hibernate-core/src/test/bundles/templates/space par/META-INF/persistence.xml b/hibernate-core/src/test/bundles/templates/space par/META-INF/persistence.xml
+index de12ae6bef..154ee468ea 100644
+--- a/hibernate-core/src/test/bundles/templates/space par/META-INF/persistence.xml	
++++ b/hibernate-core/src/test/bundles/templates/space par/META-INF/persistence.xml	
+@@ -17,7 +17,7 @@
+             <property name="hibernate.connection.driver_class" value="@jdbc.driver@"/>
+             <property name="hibernate.connection.username" value="@jdbc.user@"/>
+             <property name="hibernate.connection.password" value="@jdbc.pass@"/>
+-            <property name="hibernate.connection.url" value="@jdbc.url@"/>
++            <property name="hibernate.connection.url" value="@jdbc.url2@"/>
+             <property name="hibernate.connection.init_sql" value="@connection.init_sql@"/>
+             <property name="hibernate.hbm2ddl.auto" value="create-drop"/>
+ 			<property name="hibernate.cache.region.factory_class" value="org.hibernate.testing.cache.CachingRegionFactory" />
+diff --git a/hibernate-core/src/test/bundles/templates/war/WEB-INF/classes/META-INF/persistence.xml b/hibernate-core/src/test/bundles/templates/war/WEB-INF/classes/META-INF/persistence.xml
+index 4f61dc82a1..3eb924e7f3 100644
+--- a/hibernate-core/src/test/bundles/templates/war/WEB-INF/classes/META-INF/persistence.xml
++++ b/hibernate-core/src/test/bundles/templates/war/WEB-INF/classes/META-INF/persistence.xml
+@@ -18,7 +18,7 @@
+             <property name="hibernate.connection.driver_class" value="@jdbc.driver@"/>
+             <property name="hibernate.connection.username" value="@jdbc.user@"/>
+             <property name="hibernate.connection.password" value="@jdbc.pass@"/>
+-            <property name="hibernate.connection.url" value="@jdbc.url@"/>
++            <property name="hibernate.connection.url" value="@jdbc.url2@"/>
+             <property name="hibernate.connection.init_sql" value="@connection.init_sql@"/>
+             <property name="hibernate.hbm2ddl.auto" value="create-drop"/>
+ 			<property name="hibernate.cache.region.factory_class" value="org.hibernate.testing.cache.CachingRegionFactory" />
+diff --git a/hibernate-core/src/test/java/org/hibernate/jpa/test/query/NamedQueryCommentTest.java b/hibernate-core/src/test/java/org/hibernate/jpa/test/query/NamedQueryCommentTest.java
+index 163a78b223..5e8222e986 100644
+--- a/hibernate-core/src/test/java/org/hibernate/jpa/test/query/NamedQueryCommentTest.java
++++ b/hibernate-core/src/test/java/org/hibernate/jpa/test/query/NamedQueryCommentTest.java
+@@ -23,7 +23,7 @@ import org.hibernate.dialect.H2Dialect;
+ import org.hibernate.dialect.MySQLDialect;
+ import org.hibernate.dialect.Oracle8iDialect;
+ import org.hibernate.jpa.test.BaseEntityManagerFunctionalTestCase;
+-
++import org.hibernate.jpa.test.query.NamedQueryCommentTest.Game;
+ import org.hibernate.testing.RequiresDialect;
+ import org.hibernate.testing.TestForIssue;
+ import org.hibernate.testing.jdbc.SQLStatementInterceptor;
+@@ -104,9 +104,15 @@ public class NamedQueryCommentTest extends BaseEntityManagerFunctionalTestCase {
+ 
+ 			sqlStatementInterceptor.assertExecutedCount(1);
+ 
++			// NUODB: Start
++			if (getDialect().getClass().getName().contains("nuodb"))
++				// No space before the + sign, exact match required
++				sqlStatementInterceptor.assertExecuted(
++					" SELECT /*+ INDEX (game idx_game_title)  */ * from game g where title = ?");
++			else
++			// NUODB: End
+ 			sqlStatementInterceptor.assertExecuted(
+-					"/* + INDEX (game idx_game_title)  */ select * from game g where title = ?"
+-
++				"/* + INDEX (game idx_game_title)  */ select * from game g where title = ?"
+ 			);
+ 		} );
+ 	}
+diff --git a/hibernate-core/src/test/java/org/hibernate/test/annotations/enumerated/EntityEnum.java b/hibernate-core/src/test/java/org/hibernate/test/annotations/enumerated/EntityEnum.java
+index 88fb2573c8..8d727bb065 100644
+--- a/hibernate-core/src/test/java/org/hibernate/test/annotations/enumerated/EntityEnum.java
++++ b/hibernate-core/src/test/java/org/hibernate/test/annotations/enumerated/EntityEnum.java
+@@ -42,7 +42,7 @@ public class EntityEnum {
+ 	private long id;
+ 	private Common ordinal;
+ 	@Enumerated(EnumType.STRING)
+-	private Common string;
++	private Common xstring;   // NUODB:  String is a reserved word
+ 	@Type(type = "org.hibernate.test.annotations.enumerated.custom_types.FirstLetterType")
+ 	private FirstLetter firstLetter;
+ 	private LastNumber lastNumber;
+@@ -79,11 +79,11 @@ public class EntityEnum {
+ 	}
+ 
+ 	public Common getString() {
+-		return string;
++		return xstring;
+ 	}
+ 
+ 	public void setString(Common string) {
+-		this.string = string;
++		this.xstring = string;
+ 	}
+ 
+ 	public FirstLetter getFirstLetter() {
+diff --git a/hibernate-core/src/test/java/org/hibernate/test/annotations/enumerated/EnumeratedTypeTest.java b/hibernate-core/src/test/java/org/hibernate/test/annotations/enumerated/EnumeratedTypeTest.java
+index 439a7d9ff8..f53c998943 100644
+--- a/hibernate-core/src/test/java/org/hibernate/test/annotations/enumerated/EnumeratedTypeTest.java
++++ b/hibernate-core/src/test/java/org/hibernate/test/annotations/enumerated/EnumeratedTypeTest.java
+@@ -52,7 +52,7 @@ public class EnumeratedTypeTest extends BaseNonConfigCoreFunctionalTestCase {
+ 		assertEquals( EnumType.class.getName(), ordinalEnum.getName() );
+ 
+ 		// string defined by Enumerated(STRING)
+-		Type stringEnum = pc.getProperty( "string" ).getType();
++		Type stringEnum = pc.getProperty( "xstring" ).getType();   // NUODB
+ 		assertEquals( Common.class, stringEnum.getReturnedClass() );
+ 		assertEquals( EnumType.class.getName(), stringEnum.getName() );
+ 
+@@ -119,16 +119,16 @@ public class EnumeratedTypeTest extends BaseNonConfigCoreFunctionalTestCase {
+ 		session.getTransaction().begin();
+ 
+ 		// find
+-		entityEnum = (EntityEnum) session.createQuery( "from EntityEnum ee where ee.string='B1'" ).uniqueResult();
++		entityEnum = (EntityEnum) session.createQuery( "from EntityEnum ee where ee.xstring='B1'" ).uniqueResult();
+ 		assertEquals( id, entityEnum.getId() );
+ 		assertEquals( Common.B1, entityEnum.getString() );
+ 		// find parameter
+-		entityEnum = (EntityEnum) session.createQuery( "from EntityEnum ee where ee.string=:string" )
+-				.setParameter( "string", Common.B1 ).uniqueResult();
++		entityEnum = (EntityEnum) session.createQuery( "from EntityEnum ee where ee.xstring=:string" )
++				.setParameter( "string", Common.B1 ).uniqueResult();  // NUODB
+ 		assertEquals( id, entityEnum.getId() );
+ 		assertEquals( Common.B1, entityEnum.getString() );
+ 		// delete
+-		assertEquals( 1, session.createSQLQuery( "DELETE FROM EntityEnum where string='B1'" ).executeUpdate() );
++		assertEquals( 1, session.createSQLQuery( "DELETE FROM EntityEnum where xstring='B1'" ).executeUpdate() );  // NUODB
+ 		session.getTransaction().commit();
+ 		session.close();
+ 
+@@ -268,11 +268,11 @@ public class EnumeratedTypeTest extends BaseNonConfigCoreFunctionalTestCase {
+ 
+ 		// find
+ 		entityEnum = (EntityEnum) session.createCriteria( EntityEnum.class )
+-				.add( Restrictions.eq( "string", Common.B2 ) ).uniqueResult();
++				.add( Restrictions.eq( "xstring", Common.B2 ) ).uniqueResult();  // NUODB
+ 		assertEquals( id, entityEnum.getId() );
+ 		assertEquals( Common.B2, entityEnum.getString() );
+ 		// delete
+-		assertEquals( 1, session.createSQLQuery( "DELETE FROM EntityEnum where string='B2'" ).executeUpdate() );
++		assertEquals( 1, session.createSQLQuery( "DELETE FROM EntityEnum where xstring='B2'" ).executeUpdate() ); // NUODB
+ 
+ 		session.getTransaction().commit();
+ 		session.close();
+diff --git a/hibernate-core/src/test/java/org/hibernate/test/hql/HQLTest.java b/hibernate-core/src/test/java/org/hibernate/test/hql/HQLTest.java
+index beb71222b4..8ed2c42916 100644
+--- a/hibernate-core/src/test/java/org/hibernate/test/hql/HQLTest.java
++++ b/hibernate-core/src/test/java/org/hibernate/test/hql/HQLTest.java
+@@ -903,6 +903,14 @@ public class HQLTest extends QueryTranslatorTestCase {
+ 			assertTranslation( "select count(*) from Human h group by year(h.birthdate)" );
+ 			assertTranslation( "select count(*) from Human h group by year(sysdate)" );
+ 		}
++
++		// NUODB START: We replace trunc() by floor()
++		if ( getDialect().getClass().getName().contains("nuodb")) {
++			assertTranslation( "select count(*) from Human h group by floor( sqrt(h.bodyWeight*4)/2 )" );
++			return;
++		}
++		// NUODB END
++
+ 		assertTranslation( "select count(*) from Human h group by trunc( sqrt(h.bodyWeight*4)/2 )" );
+ 	}
+ 
+diff --git a/hibernate-core/src/test/java/org/hibernate/test/hql/QueryTranslatorTestCase.java b/hibernate-core/src/test/java/org/hibernate/test/hql/QueryTranslatorTestCase.java
+index 5e921f21b0..d87a9a3a4f 100644
+--- a/hibernate-core/src/test/java/org/hibernate/test/hql/QueryTranslatorTestCase.java
++++ b/hibernate-core/src/test/java/org/hibernate/test/hql/QueryTranslatorTestCase.java
+@@ -154,7 +154,7 @@ public abstract class QueryTranslatorTestCase extends BaseCoreFunctionalTestCase
+ 		}
+ 		else if ( newException != null ) {
+ 			newException.printStackTrace();
+-			assertNull( "Old query translator did not throw an exception, the new one did", newException );
++			assertNull( "Old query translator did not throw an exception, the new one did ...", newException );
+ 		}
+ 
+ 		// -- check all of the outputs --
+diff --git a/hibernate-core/src/test/java/org/hibernate/testing/cleaner/DatabaseCleanerContext.java b/hibernate-core/src/test/java/org/hibernate/testing/cleaner/DatabaseCleanerContext.java
+index 494197f891..62bd1bedb5 100644
+--- a/hibernate-core/src/test/java/org/hibernate/testing/cleaner/DatabaseCleanerContext.java
++++ b/hibernate-core/src/test/java/org/hibernate/testing/cleaner/DatabaseCleanerContext.java
+@@ -6,7 +6,7 @@
+  */
+ package org.hibernate.testing.cleaner;
+ 
+-import org.slf4j.LoggerFactory;
++import java.util.logging.Logger;
+ 
+ /**
+  * NUODB OVERRIDE CLASS
+@@ -19,7 +19,7 @@ public final class DatabaseCleanerContext {
+ 
+ 	public static final DatabaseCleaner CLEANER;
+ 
+-	private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(DatabaseCleanerContext.class);
++	private static final Logger LOGGER = Logger.getLogger(DatabaseCleanerContext.class.getName());
+ 
+ 	static {
+ 		LOGGER.info("Using NuoDB's modified DatabaseCleanerContext");
+@@ -39,12 +39,12 @@ public final class DatabaseCleanerContext {
+ 
+ 			for (DatabaseCleaner cleaner : cleaners) {
+ 				if (cleaner.isApplicable(connection)) {
+-					LOGGER.info("CLEANER is {}", cleaner.getClass());
++					LOGGER.info("CLEANER is " + cleaner.getClass());
+ 					return cleaner;
+ 				}
+ 			}
+ 
+-			LOGGER.error("No suitable cleaner found");
++			LOGGER.severe("No suitable cleaner found");
+ 			return null;
+ 		});
+ 	}
+diff --git a/hibernate-core/src/test/java/org/hibernate/testing/cleaner/NuoDBDatabaseCleaner.java b/hibernate-core/src/test/java/org/hibernate/testing/cleaner/NuoDBDatabaseCleaner.java
+index 0abf534396..f8dc269c34 100644
+--- a/hibernate-core/src/test/java/org/hibernate/testing/cleaner/NuoDBDatabaseCleaner.java
++++ b/hibernate-core/src/test/java/org/hibernate/testing/cleaner/NuoDBDatabaseCleaner.java
+@@ -8,7 +8,7 @@ import java.util.Set;
+ import java.util.TreeSet;
+ 
+ import org.hibernate.dialect.Dialect;
+-import org.slf4j.LoggerFactory;
++import java.util.logging.Logger;
+ 
+ import com.nuodb.hibernate.NuoDBDialect;
+ 
+@@ -20,7 +20,7 @@ import com.nuodb.hibernate.NuoDBDialect;
+ class NuoDBDatabaseCleaner implements DatabaseCleaner {
+ 
+ 	// Class Logger
+-	public static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(NuoDBDatabaseCleaner.class.getName());
++	public static final Logger LOGGER = Logger.getLogger(NuoDBDatabaseCleaner.class.getName());
+ 
+ 	private static final String NL = System.lineSeparator();
+ 
+@@ -65,7 +65,7 @@ class NuoDBDatabaseCleaner implements DatabaseCleaner {
+ 			for (String schemaName : schemas)
+ 				clearSchema(connection, schemaName);
+ 		} catch (SQLException e) {
+-			LOGGER.error("Failed clearing all schemas:" + e.getLocalizedMessage());
++			LOGGER.severe("Failed clearing all schemas:" + e.getLocalizedMessage());
+ 		}
+ 	}
+ 
+@@ -84,7 +84,7 @@ class NuoDBDatabaseCleaner implements DatabaseCleaner {
+ 			// Recreate the schema
+ 			stmt.execute("CREATE SCHEMA " + schemaName);
+ 		} catch (SQLException e) {
+-			LOGGER.error("Failed clearing schema " + schemaName + ":" + e.getLocalizedMessage());
++			LOGGER.severe("Failed clearing schema " + schemaName + ":" + e.getLocalizedMessage());
+ 		}
+ 	}
+ 
+@@ -101,7 +101,7 @@ class NuoDBDatabaseCleaner implements DatabaseCleaner {
+ 			for (String schemaName : schemas)
+ 				clearData(connection, schemaName);
+ 		} catch (SQLException e) {
+-			LOGGER.error("Failed clearing all data:" + e.getLocalizedMessage());
++			LOGGER.severe("Failed clearing all data:" + e.getLocalizedMessage());
+ 		}
+ 	}
+ 
+@@ -117,7 +117,7 @@ class NuoDBDatabaseCleaner implements DatabaseCleaner {
+ 		try (Statement stmt = connection.createStatement()) {
+ 			truncateTables(schemaName, stmt);
+ 		} catch (SQLException e) {
+-			LOGGER.error("Failed clearing all data in schema '" + schemaName + "':" + e.getLocalizedMessage());
++			LOGGER.severe("Failed clearing all data in schema '" + schemaName + "':" + e.getLocalizedMessage());
+ 			e.printStackTrace();
+ 		}
+ 	}
+diff --git a/hibernate-core/src/test/resources/hibernate.properties b/hibernate-core/src/test/resources/hibernate.properties
+index ab83a68060..691af06721 100644
+--- a/hibernate-core/src/test/resources/hibernate.properties
++++ b/hibernate-core/src/test/resources/hibernate.properties
+@@ -1,74 +1,60 @@
+ #
+-# Hibernate, Relational Persistence for Idiomatic Java
++# Hibernate, Relational Persistence for Idiomatic Java (NuoDB Tests 5.6)
++# -- Keep this in sync with 'databases/nuodb/resources/hibernate.properties'
++# -- And with the 'nuodb' section of 'gradle/databases.gradle'
+ #
+ # License: GNU Lesser General Public License (LGPL), version 2.1 or later.
+ # See the lgpl.txt file in the root directory or <http://www.gnu.org/licenses/lgpl-2.1.html>.
+ #
+ 
+-# This file is used by the tests copied from 'hibernate-orm/hibernate-core'.
+-# It also provides defaults for all the other tests.
+-# Connection properties are derived from the selected database properties file.
++# This file is a hard coded replacement for the original that uses @xxx@
++# placeholders.  Since we only test against NuoDB it's fine for our needs.
++# It is used by TestNuoDBDialect and by the Hibernate tests.
+ 
+-# Tests copied from hibernate_orm use the now deprecated Dailect.getDialect() to
+-# get a Dialect instance. This requires this property to be set and does not
+-# try to use the resolver. Unfortunately this uses the default constructor so
+-# the instance does not know the version of the underlying database. Using
+-# TestNuoDBDialect because it always does, but still has a default constructor.
+-hibernate.dialect com.nuodb.hibernate.NuoDBDialect
++# Hibernate's tests use the now deprecated 'Dialect.getDialect()' to get a
++# Dialect instance, expecting the 'hibernate.dialect' property to be set,
++# ignoring the new dialect resolver. Unfortunately this uses the dialect's
++# default constructor so the instance does not know the version of the
++# underlying database. 'TestNuoDBDialect' also has a default constructor but
++# uses JDBC meta-data to lookup the database version information.
++hibernate.dialect com.nuodb.hibernate.TestNuoDBDialect
+ 
+ hibernate.connection.driver_class com.nuodb.hibernate.NuoHibernateDriver
+-hibernate.connection.url jdbc:com.nuodb.hib://localhost/hibernate_orm_test?slf4jLogger=true&isolation=read_committed&lock-wait-timeout=60
++# Force a lock-wait so tests don't run forever
++hibernate.connection.url jdbc:com.nuodb.hib://localhost/hibernate_orm_test?jdk14Logger=true&isolation=read_committed&lock-wait-timeout=30
+ hibernate.connection.username hibernate_orm_test
+ hibernate.connection.password hibernate_orm_test
++#hibernate.connection.schema   DBO
+ 
++# EXTRA Save URL twice, no idea why the URL property sometimes gets lost, this is a "spare"!
++hibernate.connection.url2 jdbc:com.nuodb.hib://localhost/hibernate_orm_test?jdk14Logger=true&isolation=read_committed&lock-wait-timeout=30
++
++# EXTRA: Added the equivalent JPA properties
+ javax.persistence.jdbc.driver com.nuodb.hibernate.NuoHibernateDriver
+-javax.persistence.jdbc.url jdbc:com.nuodb.hib://localhost/hibernate_orm_test?slf4jLogger=true&isolation=read_committed&lock-wait-timeout=60
++javax.persistence.jdbc.url jdbc:com.nuodb.hib://localhost/hibernate_orm_test?jdk14Logger=true&isolation=read_committed&lock-wait-timeout=30
+ javax.persistence.jdbc.user hibernate_orm_test
+ javax.persistence.jdbc.password hibernate_orm_test
+ 
+-#hibernate.connection.pool_size=5
+-
+-hibernate.default_schema=DBO
++hibernate.connection.initial_pool_size 16
++hibernate.connection.pool_size 16
+ 
+-# Don't show SQL, we are using logging to display it instead
+ hibernate.show_sql false
+ hibernate.format_sql true
+ 
+-# Can't show comments, it upsets some of the tests that check the generated SQL.
+-hibernate.use_sql_comments=false
+-hibernate.max_fetch_depth=5
++hibernate.max_fetch_depth 5
+ 
+-hibernate.cache.region_prefix=hibernate.test
+-hibernate.cache.region.factory_class=org.hibernate.testing.cache.CachingRegionFactory
++hibernate.cache.region_prefix hibernate.test
++hibernate.cache.region.factory_class org.hibernate.testing.cache.CachingRegionFactory
+ 
+ javax.persistence.validation.mode=NONE
+ hibernate.service.allow_crawling=false
+ hibernate.session.events.log=true
+ 
+-#hibernate.jdbc.time_zone=UTC
+-
+ hibernate.hql.bulk_id_strategy.global_temporary.drop_tables=true
++hibernate.connection.isolation=READ_COMMITTED
+ 
+-# Reduce lock time out to 30s from 30 mins
+-# ... Not convinced this does anything useful
+-hibernate.pooling.idleTimeout=30
+-
+-# Default lock and query timeouts, both in millis - default is -1 (wait forever).
+-#javax.persistence.lock.timeout=5000
+-#javax.persistence.query.timeout=5000
++# DIALECT RESOLUTION ... Enable use of NuoDB Dialect resolver
+ 
+-# DIALECT RESOLUTION ...
+-
+-# Enable use of NuoDB Dialect resolver
++# Enable use of NuoDB Dialect resolver - do any tests actually use this?
+ hibernate.dialect_resolvers=com.nuodb.hibernate.NuoDbDialectResolver
+ hibernate.temp.use_jdbc_metadata_defaults=true
+-
+-# ... OR ...
+-
+-# Disable use of JDBC database metadata
+-#hibernate.boot.allow_jdbc_metadata_access=false
+-
+-# Must explicitly specify database and version instead
+-#javax.persistence.database-product-name=NuoDB
+-#javax.persistence.database-major-version=5
+-#javax.persistence.database-minor-version=0
+diff --git a/hibernate-infinispan/hibernate-infinispan.gradle b/hibernate-infinispan/hibernate-infinispan.gradle
+index 24393e7568..b2161ad60b 100644
+--- a/hibernate-infinispan/hibernate-infinispan.gradle
++++ b/hibernate-infinispan/hibernate-infinispan.gradle
+@@ -31,4 +31,4 @@ publishing {
+ 	}
+ }
+ 
+-task release( dependsOn: publishToSonatype )
+\ No newline at end of file
++//task release( dependsOn: publishToSonatype )
+\ No newline at end of file
+diff --git a/hibernate-testing/hibernate-testing.gradle b/hibernate-testing/hibernate-testing.gradle
+index 308d0f6044..e623fb434e 100644
+--- a/hibernate-testing/hibernate-testing.gradle
++++ b/hibernate-testing/hibernate-testing.gradle
+@@ -9,6 +9,16 @@ description = 'Support for testing Hibernate ORM functionality'
+ 
+ apply from: rootProject.file( 'gradle/published-java-module.gradle' )
+ 
++// BEGIN: For NUODB - search local repo also for the deps below.
++repositories {
++	mavenCentral()
++    //mavenLocal() // Using this, gradle can't find hibernate-core dependency
++    flatDir {
++        dirs "${System.getProperty('user.home')}/.m2/repository/com/nuodb/hibernate/nuodb-hibernate/${nuodbHibernateJarVersion}"
++    }
++}
++// END: For NUODB
++
+ 
+ dependencies {
+     compile project( ':hibernate-core' )
+@@ -35,6 +45,11 @@ dependencies {
+     compile( libraries.jboss_jta ) {
+         transitive=false;
+     }
++
++// BEGIN: For NUODB
++    implementation    "com.nuodb.jdbc:nuodb-jdbc:${nuodbJdbcJarVersion}"
++    implementation    "com.nuodb.hibernate:nuodb-hibernate:${nuodbHibernateJarVersion}"
++// END: For NUODB
+ }
+ 
+ // resources inherently exclude sources

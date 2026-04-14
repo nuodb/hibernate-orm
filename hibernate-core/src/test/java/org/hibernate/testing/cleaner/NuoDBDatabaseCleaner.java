@@ -8,7 +8,7 @@ import java.util.Set;
 import java.util.TreeSet;
 
 import org.hibernate.dialect.Dialect;
-import org.slf4j.LoggerFactory;
+import java.util.logging.Logger;
 
 import com.nuodb.hibernate.NuoDBDialect;
 
@@ -20,7 +20,7 @@ import com.nuodb.hibernate.NuoDBDialect;
 class NuoDBDatabaseCleaner implements DatabaseCleaner {
 
 	// Class Logger
-	public static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(NuoDBDatabaseCleaner.class.getName());
+	public static final Logger LOGGER = Logger.getLogger(NuoDBDatabaseCleaner.class.getName());
 
 	private static final String NL = System.lineSeparator();
 
@@ -65,7 +65,7 @@ class NuoDBDatabaseCleaner implements DatabaseCleaner {
 			for (String schemaName : schemas)
 				clearSchema(connection, schemaName);
 		} catch (SQLException e) {
-			LOGGER.error("Failed clearing all schemas:" + e.getLocalizedMessage());
+			LOGGER.severe("Failed clearing all schemas:" + e.getLocalizedMessage());
 		}
 	}
 
@@ -84,7 +84,7 @@ class NuoDBDatabaseCleaner implements DatabaseCleaner {
 			// Recreate the schema
 			stmt.execute("CREATE SCHEMA " + schemaName);
 		} catch (SQLException e) {
-			LOGGER.error("Failed clearing schema " + schemaName + ":" + e.getLocalizedMessage());
+			LOGGER.severe("Failed clearing schema " + schemaName + ":" + e.getLocalizedMessage());
 		}
 	}
 
@@ -101,7 +101,7 @@ class NuoDBDatabaseCleaner implements DatabaseCleaner {
 			for (String schemaName : schemas)
 				clearData(connection, schemaName);
 		} catch (SQLException e) {
-			LOGGER.error("Failed clearing all data:" + e.getLocalizedMessage());
+			LOGGER.severe("Failed clearing all data:" + e.getLocalizedMessage());
 		}
 	}
 
@@ -117,7 +117,7 @@ class NuoDBDatabaseCleaner implements DatabaseCleaner {
 		try (Statement stmt = connection.createStatement()) {
 			truncateTables(schemaName, stmt);
 		} catch (SQLException e) {
-			LOGGER.error("Failed clearing all data in schema '" + schemaName + "':" + e.getLocalizedMessage());
+			LOGGER.severe("Failed clearing all data in schema '" + schemaName + "':" + e.getLocalizedMessage());
 			e.printStackTrace();
 		}
 	}

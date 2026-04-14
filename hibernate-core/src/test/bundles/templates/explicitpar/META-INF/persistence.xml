@@ -24,7 +24,7 @@
             <property name="hibernate.connection.driver_class" value="@jdbc.driver@"/>
             <property name="hibernate.connection.username" value="@jdbc.user@"/>
             <property name="hibernate.connection.password" value="@jdbc.pass@"/>
-            <property name="hibernate.connection.url" value="@jdbc.url@"/>
+            <property name="hibernate.connection.url" value="@jdbc.url2@"/>
             <property name="hibernate.connection.init_sql" value="@connection.init_sql@"/>
             <property name="hibernate.cache.use_query_cache" value="true"/>
             <property name="hibernate.cache.region_prefix" value="hibernate.test"/>

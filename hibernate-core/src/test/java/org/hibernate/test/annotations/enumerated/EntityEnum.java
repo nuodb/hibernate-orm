@@ -42,7 +42,7 @@ public class EntityEnum {
 	private long id;
 	private Common ordinal;
 	@Enumerated(EnumType.STRING)
-	private Common string;
+	private Common xstring;   // NUODB:  String is a reserved word
 	@Type(type = "org.hibernate.test.annotations.enumerated.custom_types.FirstLetterType")
 	private FirstLetter firstLetter;
 	private LastNumber lastNumber;
@@ -79,11 +79,11 @@ public class EntityEnum {
 	}
 
 	public Common getString() {
-		return string;
+		return xstring;
 	}
 
 	public void setString(Common string) {
-		this.string = string;
+		this.xstring = string;
 	}
 
 	public FirstLetter getFirstLetter() {

@@ -9,6 +9,16 @@ description = 'Support for testing Hibernate ORM functionality'
 
 apply from: rootProject.file( 'gradle/published-java-module.gradle' )
 
+// BEGIN: For NUODB - search local repo also for the deps below.
+repositories {
+	mavenCentral()
+    //mavenLocal() // Using this, gradle can't find hibernate-core dependency
+    flatDir {
+        dirs "${System.getProperty('user.home')}/.m2/repository/com/nuodb/hibernate/nuodb-hibernate/${nuodbHibernateJarVersion}"
+    }
+}
+// END: For NUODB
+
 
 dependencies {
     compile project( ':hibernate-core' )
@@ -35,6 +45,11 @@ dependencies {
     compile( libraries.jboss_jta ) {
         transitive=false;
     }
+
+// BEGIN: For NUODB
+    implementation    "com.nuodb.jdbc:nuodb-jdbc:${nuodbJdbcJarVersion}"
+    implementation    "com.nuodb.hibernate:nuodb-hibernate:${nuodbHibernateJarVersion}"
+// END: For NUODB
 }
 
 // resources inherently exclude sources

@@ -31,4 +31,4 @@ publishing {
 	}
 }
 
-task release( dependsOn: publishToSonatype )
+//task release( dependsOn: publishToSonatype )

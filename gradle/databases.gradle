@@ -34,12 +34,19 @@ ext {
                         'jdbc.url'   : 'jdbc:derby:target/tmp/derby/hibernate_orm_test;databaseName=hibernate_orm_test;create=true',
                         'connection.init_sql' : ''
                 ],
+                // NUODB
                 nuodb : [
-                        'db.dialect' : 'com.nuodb.hibernate.nuodb-hibernate.NuoDBDialect',
-                        'jdbc.driver': 'com.nuodb.jdbc.Driver',
+                        'db.dialect' : 'com.nuodb.hibernate.TestNuoDBDialect',
+                        'jdbc.driver': 'com.nuodb.hibernate.NuoHibernateDriver',
                         'jdbc.user'  : 'hibernate_orm_test',
                         'jdbc.pass'  : 'hibernate_orm_test',
-                        'jdbc.url'   : 'jdbc:com.nuodb.hib://localhost/hibernate_orm_test?isolation=read_committed&lock-wait-timeout=10'
+                        'connection.init_sql' : '',
+                        // Ensure READ_COMMITTED is default isolation (like other RDBMSs) and reduce lock-wait time so failed tests fail more quickly
+                        'jdbc.url'   : 'jdbc:com.nuodb.hib://' + dbHost + '/hibernate_orm_test?isolation=read_committed&lock-wait-timeout=10',
+                        // Same URL but with an ampersand entity for substitution in persistence.xml files
+                        'jdbc.url2'   : 'jdbc:com.nuodb.hib://' + dbHost + '/hibernate_orm_test?isolation=read_committed&amp;lock-wait-timeout=10',
+                        'jdbc.datasource' : 'com.nuodb.jdbc.DataSource',
+                        'slf4jLogger' : 'false'
                 ],
                 pgsql : [
                         'db.dialect' : 'org.hibernate.dialect.PostgreSQL95Dialect',

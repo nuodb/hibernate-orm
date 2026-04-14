@@ -154,7 +154,7 @@ public abstract class QueryTranslatorTestCase extends BaseCoreFunctionalTestCase
 		}
 		else if ( newException != null ) {
 			newException.printStackTrace();
-			assertNull( "Old query translator did not throw an exception, the new one did", newException );
+			assertNull( "Old query translator did not throw an exception, the new one did ...", newException );
 		}
 
 		// -- check all of the outputs --

@@ -4,6 +4,7 @@
  * License: GNU Lesser General Public License (LGPL), version 2.1 or later.
  * See the lgpl.txt file in the root directory or <http://www.gnu.org/licenses/lgpl-2.1.html>.
  */
+ // HIBERNATE 5.6
 import org.apache.tools.ant.filters.ReplaceTokens
 import org.gradle.api.tasks.testing.TestResult.ResultType
 
@@ -11,11 +12,11 @@ import org.gradle.api.tasks.testing.TestResult.ResultType
 // Can't think of a way to make this generic, but we only test NuoDB
 buildscript {
     repositories {
-        mavenLocal()
+        mavenLocal()  // For NUODB JARs
         mavenCentral()
     }
     dependencies {
-        classpath 'com.nuodb.jdbc:nuodb-jdbc:${nuodbJdbcJarVersion}'
+        classpath "com.nuodb.jdbc:nuodb-jdbc:${nuodbJdbcJarVersion}"
         classpath "com.nuodb.hibernate:nuodb-hibernate:${nuodbHibernateJarVersion}"
     }
 }
@@ -63,19 +64,157 @@ repositories {
     mavenLocal()
 }
 
+// --------------------------------------------------------------------- //
+// -         Control which tests are included or excluded 6.2          - //
+// --------------------------------------------------------------------- //
 test {
     filter {
-        // --------------------------------------------
+        // ---------------------------------------------------------------------
         // Tests modified for NuoDB differences
-        // --------------------------------------------
+        // ---------------------------------------------------------------------
         // NuoDB has a slightly different error message
-        // org.hibernate.orm.test.batch.BatchOptimisticLockingTest.testBatchAndOptimisticLocking
+        //   org.hibernate.orm.test.batch.BatchOptimisticLockingTest.testBatchAndOptimisticLocking
+        // No space before + in NuoDB query hints
+        //   org.hibernate.jpa.test.query.NamedQueryCommentTest
+        // Expects trunc(x) but we replace trunc() by floor().
+        //   org.hibernate.test.hql.HQLTest.testGroupByFunction
 
         // ---------------------------------------------------------------------
         // Failing tests that need fixing?
         // ---------------------------------------------------------------------
+
+        // excludeTestsMatching 'org.hibernate.test.a*'
+        // excludeTestsMatching 'org.hibernate.test.b*'
+        // excludeTestsMatching 'org.hibernate.test.c*'
+        // excludeTestsMatching 'org.hibernate.test.d*'
+        // excludeTestsMatching 'org.hibernate.test.e*'
+        // excludeTestsMatching 'org.hibernate.test.f*'
+        // excludeTestsMatching 'org.hibernate.test.g*'
+        // excludeTestsMatching 'org.hibernate.test.h*'
+        // excludeTestsMatching 'org.hibernate.test.i*'
+        // excludeTestsMatching 'org.hibernate.test.j*'
+        // excludeTestsMatching 'org.hibernate.test.l*'
+        // excludeTestsMatching 'org.hibernate.test.m*'
+        // excludeTestsMatching 'org.hibernate.test.n*'
+        // excludeTestsMatching 'org.hibernate.test.o*'
+        // excludeTestsMatching 'org.hibernate.test.p*'
+        // excludeTestsMatching 'org.hibernate.test.q*'
+        // excludeTestsMatching 'org.hibernate.test.r*'
+        // excludeTestsMatching 'org.hibernate.test.s*'
+        // excludeTestsMatching 'org.hibernate.test.t*'
+        // excludeTestsMatching 'org.hibernate.test.u*'
+        // excludeTestsMatching 'org.hibernate.test.v*'
+        // excludeTestsMatching 'org.hibernate.test.w*'
+
         // Undefined reference to DESCRIPTION
-        excludeTestsMatching 'org.hibernate.orm.test.hql.BulkManipulationTest'
+        // Too few values specified in the value list
+        excludeTestsMatching 'org.hibernate.test.hql.BulkManipulationTest'
+
+        // Runs fine manually
+        excludeTestsMatching 'org.hibernate.jpa.test.lock.LockTest.testContendedPessimisticLock'
+        excludeTestsMatching 'org.hibernate.test.typedescriptor.ByteTest.testByteDataPersistenceAndRetrieval'
+
+        // expected:<x> but was:<y>
+        excludeTestsMatching 'org.hibernate.test.hql.NaturalIdDereferenceTest.doNotDereferenceNaturalIdIfIsReferenceToPrimaryKey'
+        excludeTestsMatching 'org.hibernate.test.hql.NaturalIdDereferenceTest.naturalIdDereferenceFromImplicitJoin'
+        excludeTestsMatching 'org.hibernate.test.hql.NaturalIdDereferenceTest.naturalIdDereferenceTest'
+        excludeTestsMatching 'org.hibernate.test.hql.NaturalIdDereferenceTest.nestedNaturalIdDereferenceFromImplicitJoin2'
+        excludeTestsMatching 'org.hibernate.test.hql.NaturalIdDereferenceTest.normalIdDereferenceFromImplicitJoin'
+        excludeTestsMatching 'org.hibernate.test.hql.NaturalIdDereferenceTest.selectedEntityIsNotDereferencedForPrimaryKey'
+
+        excludeTestsMatching 'org.hibernate.test.cascade.circle.identity.CascadeCircleIdentityIdTest.testCascade'
+            // org.junit.runners.model.TestTimedOutException at CascadeCircleIdentityIdTest.java:61
+        excludeTestsMatching 'org.hibernate.test.annotations.cascade.multicircle.jpa.identity.MultiCircleJpaCascadeIdentityTest.testMerge'
+            // org.junit.runners.model.TestTimedOutException at MultiCircleJpaCascadeIdentityTest.java:164
+        excludeTestsMatching 'org.hibernate.test.annotations.cascade.multicircle.jpa.identity.MultiCircleJpaCascadeIdentityTest.testPersist'
+            // org.junit.runners.model.TestTimedOutException at MultiCircleJpaCascadeIdentityTest.java:153
+        excludeTestsMatching 'org.hibernate.test.annotations.cascade.multicircle.jpa.sequence.MultiCircleJpaCascadeSequenceTest.*' // 2/3 tests fail
+
+        // Undefined table TOOL - 3/3 tests fail
+        excludeTestsMatching 'org.hibernate.jpa.test.criteria.idclass.IdClassPredicateTest'
+
+        // PreparedStatement is NOT closed
+        excludeTestsMatching 'org.hibernate.jpa.test.lock.StatementIsClosedAfterALockExceptionTest.testStatementIsClosed'
+
+        // unable to convert string "Jane Smith" into number
+        excludeTestsMatching 'org.hibernate.test.inheritance.TransientOverrideAsPersistentJoined.testFindByRootClass'
+        excludeTestsMatching 'org.hibernate.test.inheritance.TransientOverrideAsPersistentJoined.testFindBySubclass'
+        excludeTestsMatching 'org.hibernate.test.inheritance.TransientOverrideAsPersistentJoined.testQueryByRootClass'
+        excludeTestsMatching 'org.hibernate.test.inheritance.TransientOverrideAsPersistentJoined.testQueryBySublassAndOverridenProperty'
+        excludeTestsMatching 'org.hibernate.test.inheritance.TransientOverrideAsPersistentTablePerClass'
+
+        // Problems with Date and Time types
+        excludeTestsMatching 'org.hibernate.test.type.LocalDateTest'
+        excludeTestsMatching 'org.hibernate.test.temporal.TimePropertyTest.testTimeAsDate'
+        excludeTestsMatching 'org.hibernate.test.timestamp.JdbcTimeCustomTimeZoneTest.testTimeZone'
+        excludeTestsMatching 'org.hibernate.test.timestamp.JdbcTimestampCustomSessionLevelTimeZoneTest.testTimeZone'
+        excludeTestsMatching 'org.hibernate.test.timestamp.JdbcTimestampCustomTimeZoneTest.testTimeZone'
+
+        // Schema issues?
+        excludeTestsMatching 'org.hibernate.test.schemaupdate.SchemaUpdateTest'
+
+        // ---------------------------------------------------------------------
+        // Tests to skip due to known NuoDB limitations
+        // ---------------------------------------------------------------------
+
+        // Does the NuoDB JDBC JAR support NClob, NString ... ?
+        if (nuodbJdbcJarVersion.compareTo('24.2.2') < 0) {  // Supported from 24.2.2
+            println 'hibernate-core.gradle: Excluding tests of Nationalized columns'
+            excludeTestsMatching 'org.hibernate.test.criterion.NationalizedIgnoreCaseTest.testIgnoreCaseCriteria'
+            excludeTestsMatching 'org.hibernate.orm.test.type.LobUnfetchedPropertyTest.testNClob'
+            excludeTestsMatching 'org.hibernate.test.nationalized.NationalizedLobFieldTest.testNationalization'
+            excludeTestsMatching 'org.hibernate.test.type.LobUnfetchedPropertyTest.testNClob'
+        } else {
+            println 'hibernate-core.gradle: Including tests of Nationalized columns'
+        }
+
+        if (nuodbHibernateJarVersion.compareTo('7.0.0') < 0) {
+            println 'hibernate-core.gradle: Excluding tests using NuoDB 7 features'
+        } else {
+            println 'hibernate-core.gradle: Running tests using NuoDB 7 features'
+        }
+        
+        // NuoDB does not use Catalogs
+        excludeTestsMatching 'org.hibernate.test.boot.database.qualifiedTableNaming.DefaultCatalogAndSchemaTest'
+
+        // all() not supported
+        excludeTestsMatching 'org.hibernate.jpa.test.criteria.subquery.UncorrelatedSubqueryTest.testEqualAll'
+
+        // ResultSets are forward only
+        excludeTestsMatching 'org.hibernate.jpa.test.criteria.fetchscroll.CriteriaToScrollableResultsFetchTest.testWithScroll'
+        excludeTestsMatching 'org.hibernate.test.criteria.SessionCreateQueryFromCriteriaTest.testScrollMethod'
+        excludeTestsMatching 'org.hibernate.test.hql.ScrollableCollectionFetchingTest.testScrollingJoinFetchesEmptyResultSet' // Before start of result set
+        excludeTestsMatching 'org.hibernate.test.hql.ScrollableCollectionFetchingTest.testScrollingJoinFetchesPositioning'
+        excludeTestsMatching 'org.hibernate.test.hql.ScrollableCollectionFetchingTest.testScrollingJoinFetchesReverse'
+        excludeTestsMatching 'org.hibernate.test.hql.ScrollableCollectionFetchingTest.testScrollingJoinFetchesSingleRowResultSet'
+        excludeTestsMatching 'org.hibernate.test.resulttransformer.ResultTransformerTest.testResultTransformerIsAppliedToScrollableResults'
+
+        // Constraints not enforced
+        excludeTestsMatching 'org.hibernate.jpa.test.exception.ExceptionTest.testConstraintViolationException'
+        excludeTestsMatching 'org.hibernate.test.exception.SQLExceptionConversionTest.testIntegrityViolation' // INSERT should have failed
+
+        // Referencial integrity not enforced
+        excludeTestsMatching 'org.hibernate.test.manytomany.ManyToManyBidirectionalTest'
+
+        //excludeTestsMatching 'org.hibernate.jpa.test.lock.LockTest.testContendedPessimisticLock'
+
+        // SQL: '... where (x,y) IN ...' is not supported
+        excludeTestsMatching 'org.hibernate.query.hhh14156.HHH14156Test'
+
+        // multi-column value only allowed in comparison operators
+        excludeTestsMatching 'org.hibernate.test.subselect.CompositeIdTypeBindingTest'
+
+        // subqueries are not allowed in the ORDER BY clause
+        excludeTestsMatching 'org.hibernate.test.hql.size.filter.WhereAnnotatedOneToManySizeTest.orderBy_dotSize'
+        excludeTestsMatching 'org.hibernate.test.hql.size.filter.WhereAnnotatedOneToManySizeTest.orderBy_sizeOf'
+
+        // Dependent Right Outer Join not supported
+        excludeTestsMatching 'org.hibernate.test.join.OuterJoinTest.testJoinOrderWithRightJoinWithInnerImplicitJoins'
+
+        // some(SELECT ...) not supported?  SOME() is equivalent to ANY()
+        excludeTestsMatching 'org.hibernate.test.legacy.FooBarTest.testPersistCollections'
+        excludeTestsMatching 'org.hibernate.test.legacy.FooBarTest.testQuery'
+        excludeTestsMatching 'org.hibernate.test.legacy.SQLFunctionsTest.testSQLFunctions'
     }
 }
 
@@ -90,8 +229,10 @@ dependencies {
     compile( libraries.classmate )
     compile( libraries.activation )
 
+    // NUODB: BEGIN
     compile( "com.nuodb.jdbc:nuodb-jdbc:${nuodbJdbcJarVersion}" )
     compile( "com.nuodb.hibernate:nuodb-hibernate:${nuodbHibernateJarVersion}" )
+    // NUODB: END
     
     // We need dom4j for a number of things temporarily:
     //      1) (unsupported) EntityMode.DOM4J support
@@ -146,8 +287,10 @@ dependencies {
     testRuntimeOnly( libraries.atomikos_jta )
     testRuntimeOnly( libraries.wildfly_transaction_client )
 
+    // NUODB: BEGIN
     testRuntimeOnly( "com.nuodb.hibernate:nuodb-hibernate:${nuodbHibernateJarVersion}" )
-    testRuntimeOnly( "com.nuodb.jdbc:nuodb-jdbc:24.1.0" )
+    testRuntimeOnly( "com.nuodb.jdbc:nuodb-jdbc:${nuodbJdbcJarVersion}" )
+    // NUODB: END
 
     testAnnotationProcessor( project( ':hibernate-jpamodelgen' ) )
 

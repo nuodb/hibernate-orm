@@ -23,7 +23,7 @@ import org.hibernate.dialect.H2Dialect;
 import org.hibernate.dialect.MySQLDialect;
 import org.hibernate.dialect.Oracle8iDialect;
 import org.hibernate.jpa.test.BaseEntityManagerFunctionalTestCase;
-
+import org.hibernate.jpa.test.query.NamedQueryCommentTest.Game;
 import org.hibernate.testing.RequiresDialect;
 import org.hibernate.testing.TestForIssue;
 import org.hibernate.testing.jdbc.SQLStatementInterceptor;
@@ -104,9 +104,15 @@ public class NamedQueryCommentTest extends BaseEntityManagerFunctionalTestCase {
 
 			sqlStatementInterceptor.assertExecutedCount(1);
 
+			// NUODB: Start
+			if (getDialect().getClass().getName().contains("nuodb"))
+				// No space before the + sign, exact match required
+				sqlStatementInterceptor.assertExecuted(
+					" SELECT /*+ INDEX (game idx_game_title)  */ * from game g where title = ?");
+			else
+			// NUODB: End
 			sqlStatementInterceptor.assertExecuted(
-					"/* + INDEX (game idx_game_title)  */ select * from game g where title = ?"
-
+				"/* + INDEX (game idx_game_title)  */ select * from game g where title = ?"
 			);
 		} );
 	}

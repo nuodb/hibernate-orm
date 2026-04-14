@@ -903,6 +903,14 @@ public class HQLTest extends QueryTranslatorTestCase {
 			assertTranslation( "select count(*) from Human h group by year(h.birthdate)" );
 			assertTranslation( "select count(*) from Human h group by year(sysdate)" );
 		}
+
+		// NUODB START: We replace trunc() by floor()
+		if ( getDialect().getClass().getName().contains("nuodb")) {
+			assertTranslation( "select count(*) from Human h group by floor( sqrt(h.bodyWeight*4)/2 )" );
+			return;
+		}
+		// NUODB END
+
 		assertTranslation( "select count(*) from Human h group by trunc( sqrt(h.bodyWeight*4)/2 )" );
 	}
 

@@ -6,7 +6,7 @@
  */
 package org.hibernate.testing.cleaner;
 
-import org.slf4j.LoggerFactory;
+import java.util.logging.Logger;
 
 /**
  * NUODB OVERRIDE CLASS
@@ -19,7 +19,7 @@ public final class DatabaseCleanerContext {
 
 	public static final DatabaseCleaner CLEANER;
 
-	private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(DatabaseCleanerContext.class);
+	private static final Logger LOGGER = Logger.getLogger(DatabaseCleanerContext.class.getName());
 
 	static {
 		LOGGER.info("Using NuoDB's modified DatabaseCleanerContext");
@@ -39,12 +39,12 @@ public final class DatabaseCleanerContext {
 
 			for (DatabaseCleaner cleaner : cleaners) {
 				if (cleaner.isApplicable(connection)) {
-					LOGGER.info("CLEANER is {}", cleaner.getClass());
+					LOGGER.info("CLEANER is " + cleaner.getClass());
 					return cleaner;
 				}
 			}
 
-			LOGGER.error("No suitable cleaner found");
+			LOGGER.severe("No suitable cleaner found");
 			return null;
 		});
 	}
