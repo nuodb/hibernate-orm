@@ -39,9 +39,11 @@ import org.jboss.logging.Logger;
 @RunWith( CustomRunner.class )
 public abstract class BaseUnitTestCase {
 
-	static {
-		DatabaseCleaner.clearSchemas();
-	}
+	// static {
+	// 	// NuoDB
+	// 	//System.out.println(">>>> NUODB BaseUnitTestCase: Clear schemas 1 ...");
+	// 	//DatabaseCleaner.clearSchemas();
+	// }
 
 	protected final Logger log = Logger.getLogger( getClass() );
 
@@ -52,19 +54,37 @@ public abstract class BaseUnitTestCase {
 
 	protected final ExecutorService executorService = Executors.newSingleThreadExecutor();
 
-    // NuoDB BEGIN - change timeout from 30 mins to 3 minutes
+    // NuoDB BEGIN: change timeout from 30 mins to 3 minutes
 	@Rule
 	public TestRule globalTimeout = Timeout.millis( TimeUnit.MINUTES.toMillis( 3 ) ); // no test should run longer than 3 minutes
     // NUODB: END
 
 	public BaseUnitTestCase() {
+		System.out.println(">>>> Running NuoDB's modifeid BaseUnitTestCase");
+
 		if ( enableConnectionLeakDetection ) {
 			connectionLeakUtil = new ConnectionLeakUtil();
 		}
+
+		System.out.println(">>>> NUODB BaseUnitTestCase: Clear schemas 2 ...");
+		DatabaseCleaner.clearSchemas();
+
 	}
 
 	@AfterClassOnce
 	public void assertNoLeaks() {
+		// NuoDB BEGIN: Clean up after tests.  Not sure why this is necessary with NuoDB 7.0.3.
+		System.out.println(">>>> Clear schemas after tests");
+
+		try {
+			DatabaseCleaner.clearSchemas();
+		} catch (Exception e) {
+			String emsg = e.getClass().getSimpleName() + ": Failed clearing schemas after all tests have run - " + e.getLocalizedMessage();
+			System.out.println(emsg);
+			System.err.println(emsg);
+		}
+		// NuoDB END
+ 
 		if ( enableConnectionLeakDetection ) {
 			connectionLeakUtil.assertNoLeaks();
 		}

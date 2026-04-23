@@ -36,7 +36,7 @@ import static org.junit.Assert.assertNotNull;
 @TestForIssue( jiraKey = "HHH-6911" )
 public class JoinedSubclassWithImplicitDiscriminatorTest extends BaseCoreFunctionalTestCase {
 	@Entity( name = "Animal" )
-	@Table( name = "animal" )
+	//@Table(name = "animal2")  // NuoDB: Name cash with a previous test, table names case insensitive
 	@Inheritance( strategy = InheritanceType.JOINED )
 	public static abstract class Animal {
 		@Id

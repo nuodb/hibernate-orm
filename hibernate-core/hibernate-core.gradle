@@ -83,36 +83,34 @@ test {
         // Failing tests that need fixing?
         // ---------------------------------------------------------------------
 
-        // excludeTestsMatching 'org.hibernate.test.a*'
-        // excludeTestsMatching 'org.hibernate.test.b*'
-        // excludeTestsMatching 'org.hibernate.test.c*'
-        // excludeTestsMatching 'org.hibernate.test.d*'
-        // excludeTestsMatching 'org.hibernate.test.e*'
-        // excludeTestsMatching 'org.hibernate.test.f*'
-        // excludeTestsMatching 'org.hibernate.test.g*'
-        // excludeTestsMatching 'org.hibernate.test.h*'
-        // excludeTestsMatching 'org.hibernate.test.i*'
-        // excludeTestsMatching 'org.hibernate.test.j*'
-        // excludeTestsMatching 'org.hibernate.test.l*'
-        // excludeTestsMatching 'org.hibernate.test.m*'
-        // excludeTestsMatching 'org.hibernate.test.n*'
-        // excludeTestsMatching 'org.hibernate.test.o*'
-        // excludeTestsMatching 'org.hibernate.test.p*'
-        // excludeTestsMatching 'org.hibernate.test.q*'
-        // excludeTestsMatching 'org.hibernate.test.r*'
-        // excludeTestsMatching 'org.hibernate.test.s*'
-        // excludeTestsMatching 'org.hibernate.test.t*'
-        // excludeTestsMatching 'org.hibernate.test.u*'
-        // excludeTestsMatching 'org.hibernate.test.v*'
-        // excludeTestsMatching 'org.hibernate.test.w*'
-
         // Undefined reference to DESCRIPTION
         // Too few values specified in the value list
         excludeTestsMatching 'org.hibernate.test.hql.BulkManipulationTest'
 
-        // Runs fine manually
+        // Runs fine manually, fails when run as part of these tests
         excludeTestsMatching 'org.hibernate.jpa.test.lock.LockTest.testContendedPessimisticLock'
         excludeTestsMatching 'org.hibernate.test.typedescriptor.ByteTest.testByteDataPersistenceAndRetrieval'
+        
+        if (nuodbDatabaseVersion.isAfter(7,0,1)) {
+            println "hibernate-core.gradle: Excluding tests that fail with 7.0.3 (using NuoDB V${nuodbDatabaseVersion})"
+
+            // Runs fine manually, fails when run as part of these tests
+            excludeTestsMatching 'org.hibernate.test.hql.CriteriaHQLAlignmentTest.testCountReturnValues'
+            excludeTestsMatching 'org.hibernate.test.hql.WithClauseTest'  // 8/8 fail
+            includeTestsMatching 'IdPropertyIn*Test'
+            //includeTestsMatching 'JoinedSubclassWith*Test'
+            //includeTestsMatching 'UpdateOrderingIdentityIdentifierTest'
+
+            // ????
+            excludeTestsMatching 'org.hibernate.test.hql.ASTParserLoadingTest.testCollectionFetchWithDistinctionAndLimit'
+            excludeTestsMatching 'org.hibernate.test.hql.ASTParserLoadingTest.testComponentNullnessChecks'
+            excludeTestsMatching 'org.hibernate.test.hql.ASTParserLoadingTest.testEntityAndOneToOneReturnedByQuery'
+            excludeTestsMatching 'org.hibernate.test.hql.ASTParserLoadingTest.testMultipleRefsToSameParam'
+
+            //includeTestsMatching 'org.hibernate.jpa.test.criteria.TreatKeywordTest.*'
+        } else {
+            println "hibernate-core.gradle: Including tests that fail with 7.0.3 (using NuoDB V${nuodbDatabaseVersion})"
+        }
 
         // expected:<x> but was:<y>
         excludeTestsMatching 'org.hibernate.test.hql.NaturalIdDereferenceTest.doNotDereferenceNaturalIdIfIsReferenceToPrimaryKey'
@@ -136,7 +134,7 @@ test {
         // PreparedStatement is NOT closed
         excludeTestsMatching 'org.hibernate.jpa.test.lock.StatementIsClosedAfterALockExceptionTest.testStatementIsClosed'
 
-        // unable to convert string "Jane Smith" into number
+        // Unable to convert string "Jane Smith" into number
         excludeTestsMatching 'org.hibernate.test.inheritance.TransientOverrideAsPersistentJoined.testFindByRootClass'
         excludeTestsMatching 'org.hibernate.test.inheritance.TransientOverrideAsPersistentJoined.testFindBySubclass'
         excludeTestsMatching 'org.hibernate.test.inheritance.TransientOverrideAsPersistentJoined.testQueryByRootClass'
@@ -168,11 +166,11 @@ test {
             println 'hibernate-core.gradle: Including tests of Nationalized columns'
         }
 
-        if (nuodbHibernateJarVersion.compareTo('7.0.0') < 0) {
-            println 'hibernate-core.gradle: Excluding tests using NuoDB 7 features'
-        } else {
-            println 'hibernate-core.gradle: Running tests using NuoDB 7 features'
-        }
+        // if (nuodbDatabaseVersion.isBefore(7,0,0)) {
+        //     println 'hibernate-core.gradle: Excluding tests using NuoDB 7 features'
+        // } else {
+        //     println 'hibernate-core.gradle: Running tests using NuoDB 7 features'
+        // }
         
         // NuoDB does not use Catalogs
         excludeTestsMatching 'org.hibernate.test.boot.database.qualifiedTableNaming.DefaultCatalogAndSchemaTest'

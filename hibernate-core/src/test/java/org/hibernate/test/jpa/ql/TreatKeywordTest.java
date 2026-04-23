@@ -359,6 +359,7 @@ public class TreatKeywordTest extends BaseCoreFunctionalTestCase {
 	}
 
 	@Entity(name = "Animal")
+	@Table(name = "Animal2")  // NUODB: Name clash with a previous table called Animal
 	public static abstract class Animal {
 		@Id
 		@GeneratedValue
@@ -373,7 +374,10 @@ public class TreatKeywordTest extends BaseCoreFunctionalTestCase {
 			this.fast = fast;
 		}
 
-		public final boolean isFast() {
+		// This generates a Hibernate exception: Getter methods of lazy classes cannot be final:
+		// org.hibernate.test.jpa.ql.TreatKeywordTest$Dog#isFast
+		public /*final*/ boolean isFast() { // NuoDB: Remove final
+
 			return fast;
 		}
 	}

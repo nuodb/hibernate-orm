@@ -14,6 +14,8 @@ public final class DatabaseCleanerContext {
 	public static final DatabaseCleaner CLEANER;
 
 	static {
+		System.out.println(">>>> Using Hibernate's DatabaseCleanerContext");
+
 		CLEANER = JdbcConnectionContext.workReturning(
 				connection -> {
 					final DatabaseCleaner[] cleaners = new DatabaseCleaner[] {

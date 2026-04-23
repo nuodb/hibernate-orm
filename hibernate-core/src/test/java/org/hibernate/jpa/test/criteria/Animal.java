@@ -20,7 +20,7 @@ import javax.persistence.TemporalType;
  *
  */
 @Entity
-@Table( name = "ANIMAL" )
+@Table( name = "T_ANIMAL" ) // NUODB: Avoid table name clash with previous tests
 public class Animal {
 	private Long id;
 	private Animal mother;

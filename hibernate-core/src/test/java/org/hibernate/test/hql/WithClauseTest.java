@@ -10,6 +10,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
+import javax.swing.JOptionPane;
+
 import org.hibernate.HibernateException;
 import org.hibernate.Query;
 import org.hibernate.QueryException;
@@ -39,7 +41,23 @@ public class WithClauseTest extends BaseCoreFunctionalTestCase {
 		return new String[] { "hql/Animal.hbm.xml", "hql/SimpleEntityWithAssociation.hbm.xml" };
 	}
 
-	@Test
+	@Override
+	protected void afterSessionFactoryBuilt() {
+		Session s = openSession();
+		System.out.println("-------0------> HT_Animal: " +  s.createNativeQuery("show table HT_Animal").uniqueResult());
+		s.close();
+	}
+		
+		@org.junit.Before
+		public void firsrt() {
+			Session s = openSession();
+			//Transaction txn = s.beginTransaction();
+			System.out.println("-------1------> HT_Animal: " +  s.createNativeQuery("show table HT_Animal").uniqueResult());
+			//txn.commit();
+			s.close();
+		}
+	
+		@Test
 	public void testWithClauseFailsWithFetch() {
 		TestData data = new TestData();
 		data.prepare();
@@ -68,48 +86,59 @@ public class WithClauseTest extends BaseCoreFunctionalTestCase {
 
 	@Test
 	public void testWithClause() {
+		System.out.println("--------------> testWithClause 1");
 		TestData data = new TestData();
+		System.out.println("--------------> testWithClause 2");
 		data.prepare();
 
+		System.out.println("--------------> testWithClause 3");
 		Session s = openSession();
 		Transaction txn = s.beginTransaction();
+		System.out.println("--------------> testWithClause 4");
 
 		// one-to-many
 		List list = s.createQuery( "from Human h inner join h.offspring as o with o.bodyWeight < :someLimit" )
 				.setDouble( "someLimit", 1 )
 				.list();
 		assertTrue( "ad-hoc on did not take effect", list.isEmpty() );
+		System.out.println("--------------> testWithClause 5");
 
 		// many-to-one
 		list = s.createQuery( "from Animal a inner join a.mother as m with m.bodyWeight < :someLimit" )
 				.setDouble( "someLimit", 1 )
 				.list();
 		assertTrue( "ad-hoc on did not take effect", list.isEmpty() );
+		System.out.println("--------------> testWithClause 6");
 
 		list = s.createQuery( "from Human h inner join h.friends f with f.bodyWeight < :someLimit" )
 				.setDouble( "someLimit", 25 )
 				.list();
 		assertTrue( "ad-hoc on did take effect", !list.isEmpty() );
+		System.out.println("--------------> testWithClause 7");
 
 		// many-to-many
 		list = s.createQuery( "from Human h inner join h.friends as f with f.nickName like 'bubba'" )
 				.list();
 		assertTrue( "ad-hoc on did not take effect", list.isEmpty() );
+		System.out.println("--------------> testWithClause 8");
 
 		// http://opensource.atlassian.com/projects/hibernate/browse/HHH-1930
 		list = s.createQuery( "from Human h inner join h.nickNames as nicknames with nicknames = 'abc'" )
 				.list();
 		assertTrue( "ad-hoc on did not take effect", list.isEmpty() );
+		System.out.println("--------------> testWithClause 9");
 
 		list = s.createQuery( "from Human h inner join h.offspring o with o.mother.father = :cousin" )
 				.setEntity( "cousin", s.load( Human.class, Long.valueOf( "123" ) ) )
 				.list();
 		assertTrue( "ad-hoc did take effect", list.isEmpty() );
-
+		System.out.println("--------------> testWithClause 10");
 		txn.commit();
 		s.close();
-
+		
+		System.out.println("--------------> testWithClause 11");
 		data.cleanup();
+		System.out.println("--------------> testWithClause 12");
 	}
 	
 	@Test
@@ -268,6 +297,7 @@ public class WithClauseTest extends BaseCoreFunctionalTestCase {
 		public void prepare() {
 			Session session = openSession();
 			Transaction txn = session.beginTransaction();
+			System.out.println("------2-------> HT_Animal: " +  session.createNativeQuery("show table HT_Animal").uniqueResult());
 
 			Human mother = new Human();
 			mother.setBodyWeight( 10 );
@@ -325,6 +355,7 @@ public class WithClauseTest extends BaseCoreFunctionalTestCase {
 		}
 
 		public void cleanup() {
+			System.out.println("--------------> cleanup 1"); // NUODB
 			Session session = openSession();
 			Transaction txn = session.beginTransaction();
 			Human father = (Human) session.createQuery( "from Human where description = 'father'" ).uniqueResult();
@@ -337,7 +368,11 @@ public class WithClauseTest extends BaseCoreFunctionalTestCase {
 			session.delete( session.createQuery( "from Human where description = 'child2'" ).uniqueResult() );
 			session.delete( session.createQuery( "from Human where description = 'mother'" ).uniqueResult() );
 			session.delete( father );
+			System.out.println("--------------> cleanup 2"); // NUODB
+			System.out.println("------3-------> HT_Animal: " +  session.createNativeQuery("show table HT_Animal").uniqueResult());
+			System.out.println("-------------->  Contents: " + session.createNativeQuery( "select id from HT_Animal").list());
 			session.createQuery( "delete Animal" ).executeUpdate();
+			System.out.println("--------------> cleanup 3"); // NUODB
 			txn.commit();
 			session.close();
 		}

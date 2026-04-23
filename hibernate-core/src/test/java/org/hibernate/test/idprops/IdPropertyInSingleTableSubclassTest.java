@@ -13,6 +13,7 @@ import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.Inheritance;
 import javax.persistence.InheritanceType;
+import javax.persistence.Table;
 
 import org.hibernate.testing.TestForIssue;
 import org.hibernate.testing.junit4.BaseCoreFunctionalTestCase;
@@ -77,6 +78,7 @@ public class IdPropertyInSingleTableSubclassTest extends BaseCoreFunctionalTestC
 	}
 
 	@Entity(name = "Human")
+	//@Table(name = "Human2")  // NuoDB: Name cash with a previous test
 	@Inheritance(strategy = InheritanceType.SINGLE_TABLE)
 	public static class Human {
 		private Long realId;

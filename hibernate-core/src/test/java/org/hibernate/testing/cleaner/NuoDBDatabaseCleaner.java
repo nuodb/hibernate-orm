@@ -27,13 +27,12 @@ class NuoDBDatabaseCleaner implements DatabaseCleaner {
 	// private final List<String> ignoredTables = new ArrayList<>();
 
 	public NuoDBDatabaseCleaner() {
-		LOGGER.info("NuoDBDatabaseCleaner ctr");
 	}
 
 	@Override
 	public void addIgnoredTable(String tableName) {
 		// ignoredTables.add(tableName);
-		throw new UnsupportedOperationException("addIgnoredTable not impelemented for NuoDB");
+		throw new UnsupportedOperationException("addIgnoredTable not implemented for NuoDB");
 	}
 
 	/**
@@ -64,8 +63,10 @@ class NuoDBDatabaseCleaner implements DatabaseCleaner {
 
 			for (String schemaName : schemas)
 				clearSchema(connection, schemaName);
+
+			LOGGER.warning(">>>> " + schemas.size() + " schemas cleared (dropped and recreated) successfully.");
 		} catch (SQLException e) {
-			LOGGER.severe("Failed clearing all schemas:" + e.getLocalizedMessage());
+			logError("Failed clearing all schemas:", e);
 		}
 	}
 
@@ -77,14 +78,29 @@ class NuoDBDatabaseCleaner implements DatabaseCleaner {
 	 */
 	@Override
 	public void clearSchema(Connection connection, String schemaName) {
+		System.out.println(">>>> Clear schema " + schemaName);
+		LOGGER.warning("Clear schema " + schemaName);
+
 		try (Statement stmt = connection.createStatement()) {
 			// Drop the entire schema and its contents
 			stmt.execute("DROP SCHEMA " + schemaName + " CASCADE");
 
 			// Recreate the schema
 			stmt.execute("CREATE SCHEMA " + schemaName);
+
+			// Sanity check - is it empty?
+			stmt.execute("USE " + schemaName);
+			ResultSet rs = stmt.executeQuery("SHOW TABLES");
+
+			while (rs.next()) {
+				String result = rs.getString(1);
+
+				if (!result.contains("No tables found"))
+					System.out.println(">>>> " + schemaName + " NOT EMPTY ----> " + rs.getString(1));
+			}
 		} catch (SQLException e) {
-			LOGGER.severe("Failed clearing schema " + schemaName + ":" + e.getLocalizedMessage());
+			System.err.println(" ---> Failed clearing schema " + schemaName + ":" + e.getLocalizedMessage());
+			logError("Failed clearing schema " + schemaName, e);
 		}
 	}
 
@@ -100,8 +116,10 @@ class NuoDBDatabaseCleaner implements DatabaseCleaner {
 
 			for (String schemaName : schemas)
 				clearData(connection, schemaName);
+
+			System.out.println(">>>> " + schemas.size() + " schemas had their tables truncated successfully.");
 		} catch (SQLException e) {
-			LOGGER.severe("Failed clearing all data:" + e.getLocalizedMessage());
+			logError("Failed clearing all data:", e);
 		}
 	}
 
@@ -117,7 +135,7 @@ class NuoDBDatabaseCleaner implements DatabaseCleaner {
 		try (Statement stmt = connection.createStatement()) {
 			truncateTables(schemaName, stmt);
 		} catch (SQLException e) {
-			LOGGER.severe("Failed clearing all data in schema '" + schemaName + "':" + e.getLocalizedMessage());
+			logError("Failed clearing all data in schema '" + schemaName, e);
 			e.printStackTrace();
 		}
 	}
@@ -152,7 +170,10 @@ class NuoDBDatabaseCleaner implements DatabaseCleaner {
 	 * @throws SQLException Any failure.
 	 */
 	protected void truncateTables(String schemaName, Statement stmt) throws SQLException {
-		// First truncate all the tables
+		System.out.println(">>>> Truncating tables in schema " + schemaName);
+		LOGGER.warning("Truncating tables in schema " + schemaName);
+
+		// First find all the tables
 		ResultSet rs = stmt.executeQuery("SELECT tablename FROM SYSTEM.Tables WHERE schema = '" + schemaName + '\'');
 		Set<String> tables = new TreeSet<>();
 
@@ -161,7 +182,7 @@ class NuoDBDatabaseCleaner implements DatabaseCleaner {
 			tables.add(tableName);
 		}
 
-		// Truncate all the tables found using a single call to the database
+		// Truncate all the tables found by using a single call to the database
 		StringBuilder sb = new StringBuilder();
 
 		for (String tableName : tables) {
@@ -177,4 +198,7 @@ class NuoDBDatabaseCleaner implements DatabaseCleaner {
 			LOGGER.info("No tables to truncate in schema '" + schemaName + '\'');
 	}
 
+	private void logError(String emsg, Exception e) {
+		LOGGER.severe(emsg + ':' + e.getLocalizedMessage() + " (" + e.getClass().getSimpleName() + ')');
+	}
 }

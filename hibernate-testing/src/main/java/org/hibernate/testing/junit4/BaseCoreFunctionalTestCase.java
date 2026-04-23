@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -208,6 +209,7 @@ public abstract class BaseCoreFunctionalTestCase extends BaseUnitTestCase {
 	protected void addMappings(Configuration configuration) {
 		String[] mappings = getMappings();
 		if ( mappings != null ) {
+			System.out.println("-------1------> Mappings: " + Arrays.asList(mappings));
 			for ( String mapping : mappings ) {
 				configuration.addResource(
 						getBaseForMappings() + mapping,
@@ -217,18 +219,21 @@ public abstract class BaseCoreFunctionalTestCase extends BaseUnitTestCase {
 		}
 		Class<?>[] annotatedClasses = getAnnotatedClasses();
 		if ( annotatedClasses != null ) {
+			System.out.println("-------2------> Annotated classes: " + Arrays.asList(annotatedClasses));
 			for ( Class<?> annotatedClass : annotatedClasses ) {
 				configuration.addAnnotatedClass( annotatedClass );
 			}
 		}
 		String[] annotatedPackages = getAnnotatedPackages();
 		if ( annotatedPackages != null ) {
+			System.out.println("-------3------> Annotated packages: " + Arrays.asList(annotatedPackages));
 			for ( String annotatedPackage : annotatedPackages ) {
 				configuration.addPackage( annotatedPackage );
 			}
 		}
 		String[] xmlFiles = getXmlFiles();
 		if ( xmlFiles != null ) {
+			System.out.println("-------4------> XML files: " + Arrays.asList(xmlFiles));
 			for ( String xmlFile : xmlFiles ) {
 				try ( InputStream is = Thread.currentThread().getContextClassLoader().getResourceAsStream( xmlFile ) ) {
 					configuration.addInputStream( is );

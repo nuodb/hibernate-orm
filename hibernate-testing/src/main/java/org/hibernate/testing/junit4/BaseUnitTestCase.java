@@ -36,6 +36,7 @@ import org.jboss.logging.Logger;
 public abstract class BaseUnitTestCase {
 
 	static {
+		System.out.println("Original BaseUnitTestCase");  // NUODB
 		DatabaseCleaner.clearSchemas();
 	}
 
@@ -49,7 +50,7 @@ public abstract class BaseUnitTestCase {
 	protected final ExecutorService executorService = Executors.newSingleThreadExecutor();
 
 	@Rule
-	// NUODB: Chaneg timeout from 30 t0 3, otherwise tests take too long to run.
+	// NUODB: Change timeout from 30 t0 3, otherwise tests take too long to run.
 	public TestRule globalTimeout = Timeout.millis( TimeUnit.MINUTES.toMillis( 3 ) ); // no test should run longer than 3 minutes
 
 	public BaseUnitTestCase() {

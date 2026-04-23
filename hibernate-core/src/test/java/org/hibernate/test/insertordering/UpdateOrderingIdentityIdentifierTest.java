@@ -21,6 +21,7 @@ import javax.persistence.Id;
 import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
 import javax.persistence.OneToMany;
+import javax.persistence.Table;
 
 import org.hibernate.FlushMode;
 import org.hibernate.Session;
@@ -28,6 +29,7 @@ import org.hibernate.annotations.GenericGenerator;
 import org.hibernate.annotations.Parameter;
 import org.hibernate.cfg.AvailableSettings;
 import org.hibernate.jpa.test.BaseEntityManagerFunctionalTestCase;
+import org.hibernate.test.insertordering.UpdateOrderingIdentityIdentifierTest.Zoo;
 import org.junit.Test;
 
 import org.hibernate.testing.DialectChecks;
@@ -76,6 +78,7 @@ public class UpdateOrderingIdentityIdentifierTest extends BaseEntityManagerFunct
 	}
 
 	@Entity(name = "Animal")
+	//@Table(name = "Animal2")  // NuoDB: Name cash with a previous test
 	public static class Animal {
 		private Long id;
 		private Zoo zoo;

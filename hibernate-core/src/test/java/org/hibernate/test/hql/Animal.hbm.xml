@@ -10,7 +10,7 @@
 	package="org.hibernate.test.hql"
 	default-access="field">
 
-	<class name="Animal">
+	<class name="Animal" table="T_Animal">  <!-- NUODB: Avoid name clash -->
 		<id name="id">
 			<generator class="native"/>
 		</id>
