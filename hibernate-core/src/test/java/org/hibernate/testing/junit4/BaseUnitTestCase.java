@@ -20,6 +20,7 @@ import org.hibernate.testing.cleaner.DatabaseCleaner;
 import org.hibernate.testing.jdbc.leak.ConnectionLeakUtil;
 import org.hibernate.testing.jta.TestingJtaPlatformImpl;
 import org.junit.After;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
@@ -39,9 +40,10 @@ import org.jboss.logging.Logger;
 @RunWith( CustomRunner.class )
 public abstract class BaseUnitTestCase {
 
-	static {
-		DatabaseCleaner.clearSchemas();
-	}
+	// NuoDB BEGIN: Move this to an @Before method
+	// static {
+	// 	DatabaseCleaner.clearSchemas();
+	// }
 
 	protected final Logger log = Logger.getLogger( getClass() );
 
@@ -58,9 +60,14 @@ public abstract class BaseUnitTestCase {
     // NUODB: END
 
 	public BaseUnitTestCase() {
+		System.out.println(">>>> Running NuoDB's modifeid BaseUnitTestCase");
+		
 		if ( enableConnectionLeakDetection ) {
 			connectionLeakUtil = new ConnectionLeakUtil();
 		}
+
+		// NuoDB BEGIN: Clean up before tests.  Not sure why this is necessary with NuoDB 7.0.3.
+		clearSchemas();
 	}
 
 	@AfterClassOnce
@@ -68,7 +75,23 @@ public abstract class BaseUnitTestCase {
 		if ( enableConnectionLeakDetection ) {
 			connectionLeakUtil.assertNoLeaks();
 		}
+
+		// NuoDB BEGIN: Clean up after tests.  Not sure why this is necessary with NuoDB 7.0.3.
+		clearSchemas();
 	}
+	
+	protected void clearSchemas() {
+		System.out.println(">>>> NUODB BaseUnitTestCase: Clear schemas ...");
+
+		try {
+			DatabaseCleaner.clearSchemas();
+		} catch (Exception e) {
+			String emsg = e.getClass().getSimpleName() + ": Failed clearing schemas after all tests have run - " + e.getLocalizedMessage();
+			System.out.println(emsg);
+			System.err.println(emsg);
+		}
+	}
+	// NuoDB END
 
 	@After
 	public void releaseTransactions() {

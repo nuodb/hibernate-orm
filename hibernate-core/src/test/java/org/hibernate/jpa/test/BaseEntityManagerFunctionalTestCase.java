@@ -7,6 +7,8 @@
 package org.hibernate.jpa.test;
 
 import java.net.URL;
+import java.sql.ResultSet;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -32,7 +34,7 @@ import org.hibernate.hql.spi.id.local.LocalTemporaryTableBulkIdStrategy;
 import org.hibernate.jpa.HibernatePersistenceProvider;
 import org.hibernate.jpa.boot.spi.Bootstrap;
 import org.hibernate.jpa.boot.spi.PersistenceUnitDescriptor;
-
+import org.hibernate.testing.cleaner.JdbcConnectionContext;
 import org.hibernate.testing.jdbc.SharedDriverManagerConnectionProviderImpl;
 import org.hibernate.testing.junit4.BaseUnitTestCase;
 import org.junit.After;
@@ -74,6 +76,17 @@ public abstract class BaseEntityManagerFunctionalTestCase extends BaseUnitTestCa
 	public void buildEntityManagerFactory() {
 		log.trace( "Building EntityManagerFactory" );
 
+		// NUODB: Start
+		JdbcConnectionContext.work(connection -> {
+			Statement stmt = connection.createStatement();
+			stmt.execute("USE USER");
+			ResultSet rs = stmt.executeQuery("SHOW TABLES");
+			rs.next();
+			System.out.println(" >>>> (1) USER contains ... " + rs.getString(1));
+			stmt.execute("DROP SCHEMA USER CASCADE");
+		});
+		// NUODB: End
+
 		entityManagerFactory =  Bootstrap.getEntityManagerFactoryBuilder(
 				buildPersistenceUnitDescriptor(),
 				buildSettings()
@@ -83,6 +96,16 @@ public abstract class BaseEntityManagerFunctionalTestCase extends BaseUnitTestCa
 				.getParentServiceRegistry();
 
 		afterEntityManagerFactoryBuilt();
+
+		// NUODB: Start
+		JdbcConnectionContext.work(connection -> {
+			Statement stmt = connection.createStatement();
+			stmt.execute("USE USER");
+			ResultSet rs = stmt.executeQuery("SHOW TABLES");
+			rs.next();
+			System.out.println(" >>>> (2) USER contains ... " + rs.getString(1));
+		});
+		// NUODB: End
 	}
 
 	protected PersistenceUnitDescriptor buildPersistenceUnitDescriptor() {

@@ -22,7 +22,8 @@ public final class DatabaseCleanerContext {
 	private static final Logger LOGGER = Logger.getLogger(DatabaseCleanerContext.class.getName());
 
 	static {
-		LOGGER.info("Using NuoDB's modified DatabaseCleanerContext");
+		System.out.println(">>>> Using NuoDB's modified DatabaseCleanerContext");
+		LOGGER.warning("Using NuoDB's modified DatabaseCleanerContext");
 
 		CLEANER = JdbcConnectionContext.workReturning(connection -> {
 			final DatabaseCleaner[] cleaners = new DatabaseCleaner[] { //
@@ -39,13 +40,15 @@ public final class DatabaseCleanerContext {
 
 			for (DatabaseCleaner cleaner : cleaners) {
 				if (cleaner.isApplicable(connection)) {
+					System.out.println(">>>> CLEANER is " + cleaner.getClass());
 					LOGGER.info("CLEANER is " + cleaner.getClass());
 					return cleaner;
 				}
 			}
 
-			LOGGER.severe("No suitable cleaner found");
-			return null;
+			System.err.println(" ---> No suitable cleaner found - defaulting to NuoDB");
+			LOGGER.severe("No suitable cleaner found - defaulting to NuoDB");
+			return new NuoDBDatabaseCleaner(); // null;
 		});
 	}
 
