@@ -77,14 +77,7 @@ public abstract class BaseEntityManagerFunctionalTestCase extends BaseUnitTestCa
 		log.trace( "Building EntityManagerFactory" );
 
 		// NUODB: Start
-		JdbcConnectionContext.work(connection -> {
-			Statement stmt = connection.createStatement();
-			stmt.execute("USE USER");
-			ResultSet rs = stmt.executeQuery("SHOW TABLES");
-			rs.next();
-			System.out.println(" >>>> (1) USER contains ... " + rs.getString(1));
-			stmt.execute("DROP SCHEMA USER CASCADE");
-		});
+		clearSchemas();
 		// NUODB: End
 
 		entityManagerFactory =  Bootstrap.getEntityManagerFactoryBuilder(
@@ -103,7 +96,7 @@ public abstract class BaseEntityManagerFunctionalTestCase extends BaseUnitTestCa
 			stmt.execute("USE USER");
 			ResultSet rs = stmt.executeQuery("SHOW TABLES");
 			rs.next();
-			System.out.println(" >>>> (2) USER contains ... " + rs.getString(1));
+			System.out.println(" >>>> Tables for the tests ... " + rs.getString(1));
 		});
 		// NUODB: End
 	}
