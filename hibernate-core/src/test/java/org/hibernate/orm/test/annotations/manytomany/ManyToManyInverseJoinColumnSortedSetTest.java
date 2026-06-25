@@ -83,7 +83,7 @@ public class ManyToManyInverseJoinColumnSortedSetTest  {
 		} );
 	}
 
-	@Entity(name = "containing")
+	@Entity(name = "xcontaining") // NuoDB: 'containing' is reserved word
 	public static class ContainingEntity {
 		@Id
 		private Integer id;

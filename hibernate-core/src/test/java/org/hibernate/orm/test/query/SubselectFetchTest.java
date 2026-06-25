@@ -4,6 +4,7 @@
  */
 package org.hibernate.orm.test.query;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
@@ -112,6 +113,7 @@ public class SubselectFetchTest {
 		Integer id;
 		@Version
 		Integer version;
+		@Column(name="xstring") // NUODB: String is a reserved word
 		String string;
 		@Transient
 		boolean loaded = false;

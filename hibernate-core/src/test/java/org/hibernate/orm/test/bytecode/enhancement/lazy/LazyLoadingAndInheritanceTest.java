@@ -26,6 +26,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
 
 @DomainModel(
 		annotatedClasses = {
@@ -71,6 +72,7 @@ public class LazyLoadingAndInheritanceTest {
 	}
 
 	@Entity(name = "Containing")
+	@Table(name = "xcontaining") // NuoDB: containing reserved word
 	static class Containing {
 
 		@Id

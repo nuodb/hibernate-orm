@@ -1,0 +1,440 @@
+image::https://static.jboss.org/hibernate/images/hibernate_logo_whitebkg_200px.png[]
+
+// You need to keep these up to date
+:java-version: 25
+:hibernate-version: 7.2
+:hib-major: 7
+:jar-version: 24.0.0-hib{hib-major}
+:bslash: \
+
+= Hibernate and NuoDB &nbsp; &nbsp; image:https://d33wubrfki0l68.cloudfront.net/571989f106f60bced5326825bd63918a55bdf0aa/dd52a/_/img/nuodb-bird-only-green.png[width=60]
+
+== nuodb/{hibernate-version} Branch
+
+This is a fork of Hibernate ORM (http://github.com/hibernate/hibernate-orm).
+We have created NuoDB versions of branches 5.6, 6.1, 6.2, 6.6, 7.0 and 7.2 to allow testing of NuoDB's Hibernate dialect.
+The tests of interest are the profile tests in `hibernate-core` sub-project (which are intended to allow "Matrix" testing against multiple databases).
+
+* Unfortunately the section on Matrix testing (in the original README) is yet to be written (since at least 2019) and presumably never will be.
+Hence we use _profiles_ instead.
+
+IMPORTANT: If the NuoDB Hibernate JAR version changes, edit this README and change `:jar-version:` at the top.
+
+== Summary
+
+. This branch is modified to support NuoDB.
+
+* Specifically some of the Gradle build scripts and some of the testss - see 
+<<changes-to-project>> and <<files-changed>> below.
+
+. To run the tests (see <<running-tests>> for full details):
+
+* Make sure to build and install the correct Hibernate driver - see http://github.com/nuodb/HibernateDialect6 and checkout branch `7.0`.
+The README tells you what to do.
+
+* You need a database called `hibernate_orm_test` running locally on your machine, with username and password also `hibernate_orm_test`.
+
+* Run the tests in the `hibernate-core` directory:
++
+[source%autofit,sh,subs="verbatim,attributes"]
+----
+export DIALECT_VERSION={jar-version}
+DIALECT_VERSION={jar-version} ./gradlew --rerun-tasks -Pdb=nuodb clean hibernate-core:test
+----
+
+. For additional information:
+
+* <<notes-warnings>>
+* <<using-an-ide>>
+* <<database-config>>
+* <<upgrade-dialect>>
+* <<upgrade-jdbc>>
+
+[#running-tests]
+== Running Tests
+
+To run the tests for NuoDB:
+
+. Checkout this branch, `nuodb/7.2`.
+
+. Windows users are recommended to use `git bash` or WSL rather than `CMD` or _PowerShell_.
+
+. Annoyingly, you must have Java JDK {java-version} or later installed.
+Earlier versions are supported by Hibernate {hibernate-version}, but it requires Java {java-version} or later to run the Gradle build in this project.
+Hibernate decided to jump eight Java releases between 7.0 to 7.2.
+
+* For details on setting the correct JDK version, see xref:JAVA.adoc["Managing Java Versions"].
+
+. Next, make sure you have our Hibernate {hibernate-version} dialect jar available:
+
+* Clone https://github.com/nuodb/HibernateDialect6 (yes, this project needs renaming).
+* Checkout the branch to match the branch of this project that you are using.
+** 7.0 and 7.1 require _HibernateDialect6_ branch `hib-7.0`
+** 7.2 require _HibernateDialect6_ branch `hib-7.2`
+* Run `mvn -Dgpg.skip install` - see https://github.com/nuodb/HibernateDialect6#readme[project README].
+* Check the version in the POM - it will be of the form `nuodb-hibernate.NN.x.x-hib{hib-major}`
+   * You will need to set `DIALECT_VERSION` to `NN.x.x-hib{hib-major}` to match - see below.
+
+. This project's gradle build file assumes you have your maven repository in
+   the default location (`.m2` in your home directory).
+   If so, skip this step.
+
+* Otherwise you must tell gradle where this dependency can be found.
+For example, suppose you use `m2` instead of `.m2`:
++
+[source%autofit,sh,subs="verbatim,attributes"]
+----
+# Linux/MacOS
+export ADDITIONAL_REPO=~/m2/repository/com/nuodb/hibernate/nuodb-hibernate/{jar-version}
+
+# Windows
+set ADDITIONAL_REPO=c:\Users\<your-login>\.m2\repository\com\nuodb\hibernate\nuodb-hibernate{bslash}{jar-version}
+----
+
+[start=6]
+. Set the Hibernate dialect - this must match the Hibernate 6 dialect you installed earlier.
+
+* **Note:** the value you set _should_ have `-hib{hib-major}` in the end, but that's optional:
++
+[source%autofit,sh,subs="verbatim,attributes"]
+----
+export DIALECT_VERSION={jar-version}      (Linux/MacOS)
+set DIALECT_VERSION={jar-version}         (Windows)
+----
+
+* Alternatively, MacOS and Linux users may prepend it to any command:
+** `DIALECT_VERSION={jar-version} ./gradlew ...`
+
+. You _must_ be running at _least_ NuoDB V5.1.2 because tests that used to fail now pass due to enhancements in NuoDB SQL.
+
+. You need a database called `hibernate_orm_test` running locally on your machine, with username and password also `hibernate_orm_test`.
+If you do not have NuoDB installed locally, here are some options using Docker:
+
+* To use `docker compose`:
+** clone http://github.com/nuodb/nuodb-compose and (per the README):
+** `cd nuodb` and copy `env_default` to `.env`.
+** Edit `.env` and set `DB_NAME`, `DB_USER` and `DB_PASSWORD` to `hibernate_orm_test`.
+** Also (last line) uncomment and set `EXTERNAL_ADDRESS=127.0.0.1`.
+** Run: `docker compose -p hib -f monolith.yaml up -d`
+** Run: `docker exec -it hib-monolith-1 nuocmd show domain`
+
+* Or, setup a local database by running `setup.sh` inside `env` folder.
+** This script will create a NuoDB env with an admin service, a Storage Manager (SM) and a Transaction Engine (TE) to run the tests against.
+
+. For information on `gradle` refer to the original `README` content xref:README.adoc#gradle-primer[gradle-primer].
+
+. Some tests, in particular the `ASTParserLoadingTest`, do not clean up properly and leak connections.
+To avoid this, use `SET` or `export` to set the environment variable `HIBERNATE_CONNECTION_LEAK_DETECTION` to `TRUE`.
+
+. Running the Tests
+
+* **WARNING:** You _must_ use the `--rerun-tasks` option after the first run, otherwise Gradle may not run any tests at all (it only runs tests it thinks have changed and typically we only change our JAR).
+Tests can take up to an hour to run depending on your machine.
+
+* Run the tests using a database _Profile_ (the `-Pdb` option): 
+** This obeys the exclusions in `hibernate-core.gradle` so a `green-list` is no longer needed (or supported).
+
+** Windows (using `gradlew.bat`):
++
+[source%autofit,sh,subs="verbatim,attributes"]
+----
+set DIALECT_VERSION={jar-version}
+gradlew --rerun-tasks -Pdb=nuodb clean hibernate-core:test
+----
+
+** MacOS/Linux
++
+[source%autofit,sh,subs="verbatim,attributes"]
+----
+DIALECT_VERSION={jar-version} ./gradlew --rerun-tasks -Pdb=nuodb clean hibernate-core:test
+----
+
+* After running tests:
+** _15470 tests completed, 0 failed, 2596 skipped_ (NuoDB V7.0.1)
+** _15398 tests completed, 0 failed, 2606 skipped_ (NuoDB V6.02)
+
+. Full details of all failing and ignored tests can be found at link:hibernate-core/target/reports/tests/test/index.html[].
+** This directory is not populated until _after_ the test-run has finished and will be deleted by the next test run (take a copy if necessary).
+
+. To run individual tests, use `--tests <pattern>` on the command line.
+* Examples (note the use of quotes when using wildcards):
++
+```bash
+ ... hibernate-core:test --tests '*SomeTest.someSpecificFeature'
+ ... hibernate-core:test --tests '*SomeSpecificTest'
+ ... hibernate-core:test --tests 'all.in.specific.package*'
+ ... hibernate-core:test --tests '*IntegTest'
+ ... hibernate-core:test --tests '*IntegTest*ui*'
+ ... hibernate-core:test --tests '*IntegTest.singleMethod'
+```
+
+* Note that the old _green-list_ option is not supported by the Hibernate tests since version 6.
+
+* Instead, edit `hibernate-core/hibernate-core.gradle` and find the `test.filter` section.
+You can use the same patterns as above.
+For example:
++
+```groovy
+test {
+    filter {
+        // ---------------------------------------------------------------------
+        // Failing tests that need fixing
+        // ---------------------------------------------------------------------
+
+        // Run this test
+        includeTestsMatching 'org.hibernate.orm.test.hql.ASTParserLoadingTest'
+
+        // Don't run any tests from this class
+        excludeTestsMatching 'org.hibernate.orm.test.type.LocalDateTest.*'
+        ...
+    }
+}
+```
+** Adding an `includeTestsMatching` will cause gradle to _only_ run the included tests, and overrides any excludes for the same tests
+(this is like the old _green-list_).
+
+* Many tests that will never pass, typically due to syntax and features NuoDB does not support, are already excluded in this section (the equivalent of a _black-list_).
+
+[#notes-warnings]
+== Notes and Warnings
+
+* The run will fail with an error (and run no tests) if the required database cannot be connected to.
+
+* These tests are intended for testing Hibernate as well as the underlying database.
+  Many tests will be skipped if they use features our dialect does not support, and that is normal.
+  We are just piggybacking on these tests for convenience.
+
+* Many tests fail due to known limitations in NuoDB SQL and are marked for exclusion in  (see comments in the file).
+
+* Two connection properties are used:
+** `isolation=read_committed` - this is the default for most RDBMs and tests fail using our default.
+** `lock-wait-timeout=10` - the default is 30s which slows the tests down.
+
+* Not all tests clean up after themselves.
+  If using the local database you may need to reset the environment.
+** Either by using `docker compose` to destroy the container and then recreate it.
+** Or by rerunning the script `env/setup.sh`.
+
+* Test execution takes ~30 mins on average with a live database (depending on the power of your machine).
+
+* If you choose to run the matrix tests `hibernate-core/target/matrix/nuodb` is the working directory.
+
+[#using-an-ide]
+== Running Tests in an IDE
+
+It is possible to run the tests in IntelliJ (but not currently Eclipse - it fails to load the _gradle_ project).
+
+Open `hibernate-core` as a _gradle_ project in IntelliJ in the usual way.
+
+An IDE is most useful for running individual tests that have failed and debugging them.
+
+* Or use the `--tests` (command-line) or  `includeTestsMatching` options (in `hibernate-core.build`) to run a single test.
+
+* **FASTEST OPTION:** Copy the test into the `tests-from-hibernate-orm` directory of the corresponding branch of {nuodb-dialect-project}, then:
+
+** Import the project into Eclipse or IntelliJ and run test in the IDE (recommended).
+** Run the test using `mvnw ... -Dtest=...` (harder to debug).
+** Running tests via the Gradle build is very slow due to all the precompilations steps required first.
+
+// == Testing JAR from Sonatype
+
+// This involves pulling the NuoDB Hibernate JAR from Sonatype insted of your local Maven repository.
+
+// WARNING: This not yet implemented.
+
+// * Once our jar is put up at Sonatype, its URL is something like https://oss.sonatype.org/content/repositories/comnuodb-YYYY/com/nuodb/hibernate/nuodb-hibernate/{jar-version}/nuodb-hibernate-{jar-version}.jar.
+// ** Note the build number - YYYY (a 4 digit number such as 1050). To use this dependency run as follows:
+// +
+// ```sh
+// SONATYPE_VERSION=YYYY gradle clean ...   (Linux)
+
+// set SONATYPE_VERSION=YYYY               (Windows)
+// gradle clean ...
+// ```
+
+[#database-config]
+== Configure the Database
+
+If required, modify properties in `gradle/databases.gradle`.
+
+We have added two connection properties to the URL:
+
+* `isolation=read_committed` - this is the default for most other RDBMs and Hibernate assumes it.
+Many of the locking tests fail otherwise.
+* `lock-wait-timeout=10` - No need to wait for locks and a long timeout slows the run when there are failing tests due to contention (hence defining the `HIBERNATE_CONNECTION_LEAK_DETECTION` property).
+
+* _DO NOT_ change the database name or credentials as they are used by our build system.
+
+[#upgrade-dialect]
+== Upgrade Hibernate Dialect
+
+If the Hibernate dialect has a new version number:
+
+* Make sure to install it into your local Maven repository
+* Simply update the environment variable: `SET DIALECT_VERSION=<new-version>`
+
+The JAR version is required in several places and will pick up the version from the environment variable (therefore no other changes should be necessary).
+
+For the record, our Hibernate jar is referred to in:
+
+* `build.gradle`
+** Uses a "groovy" class `CheckNuoDBDatabaseAndVersion` which uses `DIALECT_VERSION` and checks that the JAR exists, is valid for the current Hibernate version and that a NuoDB database is available.
+** If you have just built and installed a new version of the JAR, it should find it - provided `DIALECT_VERSION` is set accordingly.
+** If valid, it sets `nuodbHibernatejar-version` to the value.
+
+* `hibernate-core/hibernate-testing.gradle`
+** References `${nuodbHibernatejar-version}`, no change needed.
+
+[#upgrade-jdbc]
+== Upgrade NuoDB JDBC Driver Version
+
+This must be changed manually in `build.gradle` where the version is set in the buildscript section:
+
+```groovy
+buildscript {
+	// BEGIN: For NUODB
+	// Set NuoDB JDBC JAR version
+	ext.nuodbJdbcjar-version = "24.2.1";  // Any recent version will do
+  ...
+```
+
+This variable is used throughout, so the only change needed is in `build.gradle`.
+
+To check the current version, run:
+
+```sh
+     grep recent build.gradle
+```
+
+[#changes-to-project]
+== Changes Made to Project
+
+If you need to checkout a new branch for a new version of Hibernate, you will need to make the same changes again.
+Hence, we have tried to keep changes to a minimum.
+
+* List of changed/added files (see also below): `nuodb-changed.files.txt`.
+* Full list of changes: `nuodb-changelogs.txt`.
+
+To use NuoDB:
+
+. Added this `README-NUODB.adoc` and a reference to it in `README.adoc`.
+
+. Created buildSrc directory and added the files 
+`buildSrc/src/main/groovy/CheckNuoDBDatabaseAndVersion.groovy` and
+`buildSrc/src/main/groovy/SimpleDatabaseVersion.groovy`.
+* These groovy classes are used by `build.gradle`.
+
+. Modified `build.gradle` in two places to look in the local maven repository (`.m2` in your home directory) for our dialect.
+* Also added some code to validate that our dialect version is correct for the version of Hibernate and that a NuoDB database is available.
+** Without these checks, gradle will waste 10 minutes building and compiling then fail at the first test.
+
+. Modified `local-build-plugins/src/main/groovy/local.databases.gradle` to add NuoDB and its connection properties to the `dbBundle` array.
+
+. Modified `hibernate-testing/hibernate-testing.gradle`:
+* To look in the local maven repository for our dialect.
+* To add dependencies for our JDBC and Hibernate JARs.
++
+This sub-project runs its own tests and `hibernate-core` is dependent on it.
+
+. Modified `hibernate-core/hibernate-core.gradle`:
+* To look in the local maven repository for our dialect.
+* To filter (exclude) tests that we know do not run.
+Mostly this is due to generating syntax or using features NuoDB SQL does not support.
+* You can annotate a class with `@SkipTest` to skip it for a given dialect, but this would involve changing far too many classes.
+
+. Copied `BaseUnitTestCase.java` from the `hibernate-testing` project.
+* Modified the test timeout rule, reducing it from 30 to 3 mins (otherwise the tests take ages to run when timeout tests are failing).
+* It's in `hibernate-core/src/test/java/org/hibernate/testing/junit4`.
+
+. Modified classes that use `Containing`, `String` or `Ver` as class or data-member names (they are reserved words in NuoDB).
+* To find them initially, run:
++
+```bash
+   grep -Ri "\"ver\"" hibernate-core/src/test/java/org/hibernate
+   grep -Ri "\"containing\"" hibernate-core/src/test/org/hibernate
+   grep -R "String string" hibernate-core/src/test/org/hibernate
+```
+* Edit files as follows:
+** Replace `"ver"`        by `"xver" // NuoDB: ver reserved word`
+** For any class annotated with `@Entity(name = "containing")` add extra line: +
+	`@Table(name = "xcontaining") // NuoDB: containing reserved word`
+** Replace `"containing"` by `"xcontaining" // NuoDB: containing reserved word`
+** Replace `"Containing"` by `"XContaining" // NuoDB: containing reserved word`
+** If used in a _mapped by_ clause, the corresponding data-member, and every use of it, needs changing to `xcontaining`
+** For any data-member `String string`, add or modify `@Column` with `name="xstring"`
+
+* Once changed, simply look for the comments
++
+```bash
+   grep -rl NuoDB ../hibernate-orm-7-0-nuodb | grep -v target
+```
+
+* If you need to change any other files, please mark the change like this so it can be found using `grep`:
++
+```java
+// NUODB: START ...
+...
+// NUODB: END
+```
+
+[#files-changed]
+=== Files Changed
+
+Output from `git status`. See also `nuodb-change-log.txt`.
+
+```bash
+   modified:   README.adoc
+   modified:   build.gradle
+   modified:   gradle.properties
+   modified:   hibernate-core/hibernate-core.gradle
+   modified:   hibernate-testing/hibernate-testing.gradle
+   modified:   local-build-plugins/src/main/groovy/local.databases.gradle
+   modified:   local-build-plugins/src/main/java/org/hibernate/orm/antlr/AntlrHelper.java
+   modified:   settings.gradle
+
+   added:      buildSrc/build/classes/groovy/main/CheckNuoDBDatabaseAndVersion.class
+   added:      buildSrc/src/main/groovy/CheckNuoDBDatabaseAndVersion.groovy
+   added:      buildSrc/src/main/groovy/SimpleDatabaseVersion.groovy
+   added:      hibernate-core/src/test/java/org/hibernate/testing/junit4/BaseUnitTestCase.java
+   added:      .java-version
+   added:      JAVA.adoc
+   added:      nuodb-change-log.txt
+   added:      README-NUODB.adoc
+
+   // Tests
+   modified:   hibernate-core/hibernate-core.gradle
+   modified:   hibernate-core/src/test/java/org/hibernate/orm/test/annotations/lob/VersionedBook.java
+   modified:   hibernate-core/src/test/java/org/hibernate/orm/test/annotations/lob/VersionedCompiledCode.java
+   modified:   hibernate-core/src/test/java/org/hibernate/orm/test/annotations/manytomany/ManyToManyInverseJoinColumnSortedSetTest.java
+   modified:   hibernate-core/src/test/java/org/hibernate/orm/test/batch/BatchOptimisticLockingTest.java
+   modified:   hibernate-core/src/test/java/org/hibernate/orm/test/batch/OptionalSecondaryTableBatchTest.java
+   modified:   hibernate-core/src/test/java/org/hibernate/orm/test/boot/database/metadata/MetadataAccessTests.java
+   modified:   hibernate-core/src/test/java/org/hibernate/orm/test/bytecode/enhancement/lazy/LazyLoadingAndInheritanceTest.java
+   modified:   hibernate-core/src/test/java/org/hibernate/orm/test/bytecode/enhancement/lazy/LazyOneToOneRemoveFlushAccessTest.java
+   modified:   hibernate-core/src/test/java/org/hibernate/orm/test/dialect/resolver/DialectFactoryTest.java
+   modified:   hibernate-core/src/test/java/org/hibernate/orm/test/embeddable/MappedByEmbeddableTest.java
+   modified:   hibernate-core/src/test/java/org/hibernate/orm/test/embeddable/OrderByEmbeddableToOneTest.java
+   modified:   hibernate-core/src/test/java/org/hibernate/orm/test/embeddable/OrderByEmbeddableX2Test.java
+   modified:   hibernate-core/src/test/java/org/hibernate/orm/test/exceptionhandling/StaleObjectMergeTest.java
+   modified:   hibernate-core/src/test/java/org/hibernate/orm/test/exceptionhandling/StaleObjectStateExceptionHandlingTest.java
+   modified:   hibernate-core/src/test/java/org/hibernate/orm/test/exceptionhandling/StaleVersionedObjectMergeTest.java
+   modified:   hibernate-core/src/test/java/org/hibernate/orm/test/fetch/OneToOneOwnerByContainedEagerCyclesTest.java
+   modified:   hibernate-core/src/test/java/org/hibernate/orm/test/jpa/criteria/basic/ExpressionsTest.java
+   modified:   hibernate-core/src/test/java/org/hibernate/orm/test/jpa/metadata/TypesafeNamedQueryTest.java
+   modified:   hibernate-core/src/test/java/org/hibernate/orm/test/loading/LoadContainedInDoubleContainingTest.java
+   modified:   hibernate-core/src/test/java/org/hibernate/orm/test/loading/LoadParentChildEntityTest.java
+   modified:   hibernate-core/src/test/java/org/hibernate/orm/test/locking/JoinedInheritanceOptimisticForceIncrementTest.java
+   modified:   hibernate-core/src/test/java/org/hibernate/orm/test/locking/LockRefreshTest.java
+   modified:   hibernate-core/src/test/java/org/hibernate/orm/test/mapping/MappedSuperclassWithGenericsTest.java
+   modified:   hibernate-core/src/test/java/org/hibernate/orm/test/mapping/basic/StringMappingTests.java
+   modified:   hibernate-core/src/test/java/org/hibernate/orm/test/query/QueryTimeOutTest.java
+   modified:   hibernate-core/src/test/java/org/hibernate/orm/test/query/SelectWithWrongResultTypeTest.java
+   modified:   hibernate-core/src/test/java/org/hibernate/orm/test/query/SubselectFetch2Test.java
+   modified:   hibernate-core/src/test/java/org/hibernate/orm/test/query/SubselectFetchTest.java
+   modified:   hibernate-core/src/test/java/org/hibernate/orm/test/query/hql/FunctionTests.java
+   modified:   hibernate-core/src/test/java/org/hibernate/orm/test/query/hql/StandardFunctionTests.java
+   modified:   hibernate-core/src/test/java/org/hibernate/orm/test/sql/TemplateTest.java
+   modified:   hibernate-core/src/test/java/org/hibernate/orm/test/stateless/StatelessSessionStatisticsTest.java
+   modified:   hibernate-core/src/test/java/org/hibernate/orm/test/version/sybase/SybaseTimestampComparisonAnnotationsTest.java
+   modified:   hibernate-core/src/test/resources/org/hibernate/orm/test/typeparameters/Widget.hbm.xml
+```

@@ -112,6 +112,18 @@ public class DialectFactoryTest {
 
 	@Test
 	public void testPreregisteredDialects() {
+		// NUODB: Start
+		Class<? extends Dialect> nuoDbDialectClass = H2Dialect.class;
+		DialectResolver nuoDbResolver = null;
+
+		try {
+			nuoDbDialectClass = (Class<? extends Dialect>)Class.forName("com.nuodb.hibernate.NuoDBDialect");
+			nuoDbResolver =  (DialectResolver)Class.forName("com.nuodb.hibernate.NuoDBDialectResolver").newInstance();
+		} catch (Exception e) {
+			java.util.logging.Logger.getLogger(DialectFactoryTest.class.getName()).severe("Unable to load NuoDBDialect class");
+		}
+		// NUODB: End
+
 		DialectResolver resolver = new StandardDialectResolver();
 		testDetermination( "HSQL Database Engine", HSQLDialect.class, resolver );
 		testDetermination( "H2", H2Dialect.class, resolver );
@@ -156,6 +168,15 @@ public class DialectFactoryTest {
 		testDetermination( "Oracle", 9, OracleDialect.class, resolver );
 		testDetermination( "Oracle", 10, OracleDialect.class, resolver );
 		testDetermination( "Oracle", 11, OracleDialect.class, resolver );
+		// NUODB: Start
+		resolver = nuoDbResolver;
+
+		if (resolver != null ) {
+			testDetermination( "NuoDB", 5, nuoDbDialectClass, resolver );
+			testDetermination( "NuoDB", 6, nuoDbDialectClass, resolver );
+			testDetermination( "NuoDB", 7, nuoDbDialectClass, resolver );
+		}
+		// NUODB: End
 	}
 
 	@Test

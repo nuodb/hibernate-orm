@@ -19,6 +19,7 @@ import org.hibernate.dialect.CockroachDialect;
 import org.hamcrest.number.IsCloseTo;
 import org.hibernate.testing.orm.domain.StandardDomainModel;
 import org.hibernate.testing.orm.domain.gambit.EntityOfBasics;
+import org.hibernate.testing.orm.junit.DialectContext; // For NuoDB
 import org.hibernate.testing.orm.junit.DialectFeatureChecks;
 import org.hibernate.testing.orm.junit.DomainModel;
 import org.hibernate.testing.orm.junit.RequiresDialectFeature;
@@ -230,7 +231,9 @@ public class StandardFunctionTests {
 							.list();
 					session.createQuery("select abs(e.theDouble), sign(e.theDouble), sqrt(e.theDouble) from EntityOfBasics e")
 							.list();
-					session.createQuery("select exp(e.theDouble), ln(e.theDouble + 1) from EntityOfBasics e")
+					// NuoDB ln() not supported
+					//session.createQuery("select exp(e.theDouble), ln(e.theDouble + 1) from EntityOfBasics e")
+					session.createQuery("select exp(e.theDouble) from EntityOfBasics e")
 							.list();
 					session.createQuery("select power(e.theDouble + 1, 2.5) from EntityOfBasics e")
 							.list();
@@ -610,8 +613,12 @@ public class StandardFunctionTests {
 					session.createQuery("select extract(day of week from e.theDate) from EntityOfBasics e")
 							.list();
 
+					// NUODB: START  No support for extract(WEEK)
+					if (!DialectContext.getDialect().getClass().getName().contains("nuodb"))
 					session.createQuery("select extract(week from e.theDate) from EntityOfBasics e")
 							.list();
+					// NUODB: END
+
 					session.createQuery("select extract(quarter from e.theDate) from EntityOfBasics e")
 							.list();
 
@@ -698,6 +705,8 @@ public class StandardFunctionTests {
 	public void testExtractFunctionWithAssertions(SessionFactoryScope scope) {
 		scope.inTransaction(
 				session -> {
+					// NUODB: START  No support for extract(WEEK)
+					if (!DialectContext.getDialect().getClass().getName().contains("nuodb")) {
 					assertThat(
 							session.createQuery(
 									"select extract(week of year from {2019-01-01}) from EntityOfBasics b where b.id = 123" )
@@ -735,19 +744,22 @@ public class StandardFunctionTests {
 							is( 1 )
 					);
 
+					// NUODB: Moved this from just below
+					assertThat(
+							session.createQuery( "select extract(week from {2019-05-27}) from EntityOfBasics" )
+									.getResultList()
+									.get( 0 ),
+							is( 22 )
+					);
+					}
+					// NUODB: END
+
 					assertThat(
 							session.createQuery(
 									"select extract(week of month from {2019-05-01}) from EntityOfBasics" )
 									.getResultList()
 									.get( 0 ),
 							is( 1 )
-					);
-
-					assertThat(
-							session.createQuery( "select extract(week from {2019-05-27}) from EntityOfBasics" )
-									.getResultList()
-									.get( 0 ),
-							is( 22 )
 					);
 
 					assertThat(

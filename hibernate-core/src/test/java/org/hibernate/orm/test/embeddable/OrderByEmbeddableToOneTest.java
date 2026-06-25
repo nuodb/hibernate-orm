@@ -46,7 +46,8 @@ public class OrderByEmbeddableToOneTest {
 		} );
 
 		factoryScope.inTransaction( session -> {
-			Query<Containing> query = session.createQuery( "select c from containing c order by c.id asc", Containing.class );
+			// NuoDB: 'containing' is reserved word
+			Query<Containing> query = session.createQuery( "select c from xcontaining c order by c.id asc", Containing.class );
 
 			List<Containing> resultList = query.getResultList();
 			assertThat( resultList ).hasSize( 3 );
@@ -92,7 +93,7 @@ public class OrderByEmbeddableToOneTest {
 		session.persist( contained3 );
 	}
 
-	@Entity(name = "containing")
+	@Entity(name = "xcontaining") // NuoDB: 'containing' is reserved word
 	public static class Containing {
 
 		@Id

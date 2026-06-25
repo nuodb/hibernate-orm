@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToOne;
+import jakarta.persistence.PrimaryKeyJoinColumn;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -47,7 +48,7 @@ public class LoadContainedInDoubleContainingTest {
 		} );
 	}
 
-	@Entity(name = "Containing")
+	@Entity(name = "xContaining") // NuoDB: 'containing' is reserved word
 	public static class Containing {
 
 		@Id
@@ -112,6 +113,7 @@ public class LoadContainedInDoubleContainingTest {
 		private String text;
 
 		@OneToOne
+		@PrimaryKeyJoinColumn(name="xcontaining") // NuoDB: 'containing' is reserved word
 		private Containing containing;
 
 		public Contained() {

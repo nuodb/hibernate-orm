@@ -88,7 +88,7 @@ public class OneToOneOwnerByContainedEagerCyclesTest {
 		} );
 	}
 
-	@Entity(name = "Containing")
+	@Entity(name = "xContaining") // NuoDB: 'containing' is reserved word
 	public static class Containing {
 
 		@Id

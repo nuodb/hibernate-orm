@@ -37,7 +37,11 @@ public class StatelessSessionStatisticsTest {
 		final StatisticsImplementor statistics = scope.getSessionFactory().getStatistics();
 		final Dialect dialect = scope.fromSession( session -> session.getDialect() );
 		final boolean isSybaseOrMysql = dialect.getClass().getName().toLowerCase( Locale.ROOT ).split( "sybase|mysql" ).length == 2;
-		int stmtCount = isSybaseOrMysql ? 4 : 3;
+
+		// NUODB: START - like Sybase and MySQL, NuoDB uses 4 prepared statements
+		final boolean isNuoDb = dialect.getClass().getName().contains("com.nuodb");
+		int stmtCount = isSybaseOrMysql || isNuoDb ? 4 : 3;  //
+		// NUODB: END
 
 		assertEquals(0, statistics.getEntityInsertCount());
 		assertEquals(0, statistics.getEntityUpdateCount());

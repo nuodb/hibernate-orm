@@ -10,6 +10,13 @@ plugins {
 
 description = 'Support for testing Hibernate ORM functionality'
 
+// BEGIN: For NUODB - search local repo also
+repositories {
+	mavenCentral()
+    mavenLocal()
+}
+// END: For NUODB
+
 dependencies {
     api project( ':hibernate-core' )
     api project( ':hibernate-community-dialects' )
@@ -39,6 +46,11 @@ dependencies {
     }
 
     api testLibs.log4j2
+
+// BEGIN: For NUODB
+    implementation    "com.nuodb.jdbc:nuodb-jdbc:${nuodbJdbcJarVersion}"
+    implementation    "com.nuodb.hibernate:nuodb-hibernate:${nuodbHibernateJarVersion}"
+// END: For NUODB
 
     implementation libs.hibernateModels
     implementation libs.jandex

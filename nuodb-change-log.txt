@@ -1,0 +1,1536 @@
+diff --git a/README.adoc b/README.adoc
+index cc38a7d306..1219d37695 100644
+--- a/README.adoc
++++ b/README.adoc
+@@ -1,4 +1,7 @@
+-== Hibernate ORM
++== Hibernate ORM 7.2
++
++NOTE: This is a fork of the `hibernate-orm` project and we use it to test NuoDB's Hibernate Dialects.
++For more information see xref:README-NUODB.adoc[].
+ 
+ image:https://img.shields.io/maven-central/v/org.hibernate.orm/hibernate-core.svg?label=Maven%20Central&style=for-the-badge[Maven Central,link=https://central.sonatype.com/search?namespace=org.hibernate.orm&sort=name]
+ image:https://img.shields.io/jenkins/build?jobUrl=https%3A%2F%2Fci.hibernate.org%2Fjob%2Fhibernate-orm-pipeline%2Fjob%2Fmain%2F&style=for-the-badge[Build Status,link=https://ci.hibernate.org/job/hibernate-orm-pipeline/job/main/]
+diff --git a/build.gradle b/build.gradle
+index 9f5600731a..4346f0396d 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -4,14 +4,23 @@
+  */
+ 
+ buildscript {
+-//	repositories {
+-//		mavenCentral()
+-//	}
++	// BEGIN: For NUODB
++	// Set NuoDB JDBC JAR version
++	ext.nuodbJdbcJarVersion = "24.2.1";  // Any recent version will do
++	println("build.gradle: Using NuoDB JDBC JAR ${nuodbJdbcJarVersion} - edit file to change.")
++
++	// Look for our JARs locally
++	repositories {
++		mavenCentral()
++		mavenLocal()
++	}
++	// END: For NUODB
+ 
+ 	dependencies {
+ //		classpath 'org.asciidoctor:asciidoctor-gradle-plugin:1.5.7'
+ 		classpath buildscriptLibs.forbiddenapis
+ 		classpath 'org.junit.platform:junit-platform-gradle-plugin:1.0.3'
++		classpath "com.nuodb.jdbc:nuodb-jdbc:${nuodbJdbcJarVersion}"  // For NUODB
+ 	}
+ }
+ 
+@@ -35,6 +44,36 @@ plugins {
+ 	id "com.dorongold.task-tree" version "4.0.1"
+ }
+ 
++repositories {
++	mavenCentral()
++	mavenLocal()
++}
++
++// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
++// BEGIN: For NUODB
++
++// Tests take about 10 mins to compile and will then fail if the database is
++// unavailable or the dialect is wrong.  We do our own checks here to catch
++// such errors early. Make sure that 'SimpleDatabaseVersion.groovy' and
++// 'CheckNuoDBDatabaseAndVersion.groovy' exist in 'buildSrc/src/main/groovy'.
++
++// >> MAKE SURE THESE ARE VALID FOR THE CURRENT BRANCH
++String groovySrcDir = "${project.projectDir}/buildSrc/src/main/groovy";
++String databasesGradleFile = 'local-build-plugins/src/main/groovy/local.databases.gradle';
++
++if (!file(groovySrcDir).exists())
++	throw new RuntimeException("'${groovySrcDir}' not found - make it exists and copy"
++		+ ' SimpleDatabaseVersion.groovy and CheckNuoDBDatabaseAndVersion.groovy into it');
++
++var checker = //
++	new CheckNuoDBDatabaseAndVersion(com.nuodb.jdbc.DataSource.class) //
++		.validate(nuodbJdbcJarVersion, project, databasesGradleFile);
++
++// Save these away
++ext.nuodbHibernateJarVersion = checker.nuodbHibernateJarVersion;
++ext.nuodbVersion = checker.nuodbVersion;
++ext.nuodbDatabaseVersion = checker.nuodbDatabaseVersion;
++// END: For NUODB
+ 
+ // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ // Releasing
+diff --git a/gradle.properties b/gradle.properties
+index 55e1337400..745a5b0427 100644
+--- a/gradle.properties
++++ b/gradle.properties
+@@ -3,7 +3,7 @@ db=h2
+ # Keep all these properties in sync unless you know what you are doing!
+ # We set '-Dlog4j2.disableJmx=true' to prevent classloader leaks triggered by the logger.
+ # (Some of these settings need to be repeated in the test.jvmArgs blocks of each module)
+-org.gradle.jvmargs=-Dlog4j2.disableJmx -Xmx2g -XX:MaxMetaspaceSize=256m -XX:+HeapDumpOnOutOfMemoryError -Duser.language=en -Duser.country=US -Duser.timezone=UTC -Dfile.encoding=UTF-8
++org.gradle.jvmargs=-Dlog4j2.disableJmx=true -Xmx2g -XX:MaxMetaspaceSize=256m -XX:+HeapDumpOnOutOfMemoryError -Duser.language=en -Duser.country=US -Duser.timezone=UTC -Dfile.encoding=UTF-8
+ toolchain.compiler.jvmargs=-Dlog4j2.disableJmx=true -Xmx2g -XX:MaxMetaspaceSize=256m -XX:+HeapDumpOnOutOfMemoryError -Duser.language=en -Duser.country=US -Duser.timezone=UTC -Dfile.encoding=UTF-8
+ toolchain.javadoc.jvmargs=-Dlog4j2.disableJmx=true -Xmx2g -XX:MaxMetaspaceSize=256m -XX:+HeapDumpOnOutOfMemoryError -Duser.language=en -Duser.country=US -Duser.timezone=UTC -Dfile.encoding=UTF-8
+ toolchain.launcher.jvmargs=-Dlog4j2.disableJmx=true -Xmx2g -XX:MaxMetaspaceSize=448m -XX:+HeapDumpOnOutOfMemoryError -Duser.language=en -Duser.country=US -Duser.timezone=UTC -Dfile.encoding=UTF-8
+diff --git a/hibernate-core/hibernate-core.gradle b/hibernate-core/hibernate-core.gradle
+index a9bd5791df..d496f52b09 100644
+--- a/hibernate-core/hibernate-core.gradle
++++ b/hibernate-core/hibernate-core.gradle
+@@ -21,6 +21,508 @@ configurations {
+     }
+ }
+ 
++// BEGIN: For NUODB - search local repo also
++repositories {
++	mavenCentral()
++    mavenLocal()
++}
++
++// Does the NuoDB JDBC JAR support NClob, NString ... ?
++if (nuodbJdbcJarVersion.toString().compareTo("24.2.2") < 0)
++    println("Skipping NClob tests - wrong NuoDB JDBC JAR version: ${nuodbJdbcJarVersion}");
++else
++    println("Skipping NClob tests - compliant NuoDB JDBC JAR version: ${nuodbJdbcJarVersion}");
++
++println "Building Hibernate Version ${version}, testing against ${db}"
++
++// --------------------------------------------------------------------- //
++// -          Control which tests are included or excluded 6.6         - //
++// --------------------------------------------------------------------- //
++
++test {
++    filter {
++        // ----------------------------------------------------------------------------
++        // Tests modified for NuoDB differences allowing most of a test method to run,
++        // rather than skipping the whole thing.
++        // ----------------------------------------------------------------------------
++        // org.hibernate.orm.test.batch.BatchOptimisticLockingTest - Shorter message in (expected) exception
++        // org.hibernate.orm.test.boot.database.metadata.MetadataAccessTests - Modify to only test with NuoDB
++        // org.hibernate.orm.test.dialect.resolver.DialectFactoryTest  - add our Dialect
++        // org.hibernate.orm.test.jpa.criteria.basic.ExpressionsTest - skip comparison of TIME intervals
++        // org.hibernate.orm.test.jpa.metadata.TypesafeNamedQueryTest.java - added a 1s delay so timeStamps differ
++        // org.hibernate.orm.test.query.hql.FunctionTests = Skips queries using ln(), log(), log10(), extract(WEEK ...)
++        // org.hibernate.orm.test.query.hql.StandardFunctionTests - ignore ln(), extract(WEEK ...)
++        // org.hibernate.orm.test.query.QueryTimeOutTest - add our dialect (we use same syntax as Oracle)
++        // org.hibernate.orm.test.stateless.StatelessSessionStatisticsTest - NuoDB uses 4 prep stmts (like sybase and mysql) not 3
++
++        // ---------------------------------------------------------------------
++        // Failing tests that need fixing?
++        // ---------------------------------------------------------------------
++
++        // NuoDB has a slightly different error message
++        // org.hibernate.orm.test.batch.BatchOptimisticLockingTest.testBatchAndOptimisticLocking
++
++        // Contrived LIKE patterns fail (3 tests)
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.LikeEscapeDefaultTest'
++
++        // Works when run on its own
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testAggregateIndexElementWithPath'
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testDurationArithmetic'
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testDurationArithmeticWithParameters'
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testFormat'
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testFormatTime'
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testImplicitCollectionJoinInSelect'
++        excludeTestsMatching 'org.hibernate.orm.test.hql.BulkManipulationTest.testInsertWithManyToOne' // Undefined reference to DESCRIPTION
++        excludeTestsMatching 'org.hibernate.orm.test.hql.BulkManipulationTest.testInsertWithSelectListUsingJoins'
++
++        // WARNING: Failing tests from this class leak connections and exhaust the pool, so all subsequent tests fail
++        excludeTestsMatching 'org.hibernate.orm.test.hql.ASTParserLoadingTest.testEJBQLFunctions' // Cannot compare INTEGER to OBJECT?
++        //includeTestsMatching 'ASTParserLoadingTest.testAnyMappingReference'
++        //includeTestsMatching 'ASTParserLoadingTest.testComponentParameterBinding'
++        //includeTestsMatching 'ASTParserLoadingTest.testComponentQueries'
++        //includeTestsMatching 'ASTParserLoadingTest.testRowValueConstructorSyntaxInInList'
++
++        // Not sure what this should be showing, but it exposed a strange behavior where Hibernate generates: SELECT .... GROUP BY ().
++        //includeTestsMatching 'CriteriaLiteralWithSingleQuoteTest.testLiteralProjectionAndGroupBy'
++
++        // undefined reference to "V1_0"."NAME", presumably because 'v1_'0' is only valid within the join in brackets
++        // select  li1_0.id, li1_0.order_id, li1_0.product_id, li1_0.quantity, li1_0.subTotal  from  LineItem li1_0
++        //     join (Product p1_0 join Vendor v1_0 on v1_0.id=p1_0.vendor_id) 
++        //        on p1_0.id=li1_0.product_id , /* CROSS JOIN */ orders o1_0 join ASSOCIATE sa1_0 
++        //        on sa1_0.id=o1_0.associate_id  and v1_0.name=sa1_0.familyName;
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.JpaCrossJoinBaselineTests.testCrossJoin'
++
++        // Timezones and timestamps. Several of these fail even though expected and actual match
++        excludeTestsMatching 'org.hibernate.orm.test.type.temporal.LocalDateTest.nativeWriteThenRead'
++        excludeTestsMatching 'org.hibernate.orm.test.type.temporal.LocalDateTest.writeThenNativeRead'
++        excludeTestsMatching 'org.hibernate.orm.test.type.temporal.LocalDateTest.writeThenRead'
++   
++        // Timezone not picked up from Hibernate
++        excludeTestsMatching 'org.hibernate.orm.test.timestamp.JdbcTimeCustomTimeZoneTest.testTimeZone'
++        excludeTestsMatching 'org.hibernate.orm.test.timestamp.JdbcTimestampCustomSessionLevelTimeZoneTest.testTimeZone'
++        excludeTestsMatching 'org.hibernate.orm.test.timestamp.JdbcTimestampCustomTimeZoneTest.testTimeZone'
++
++        // Can't convert LocalDate, LocalTime, LocalDateTime to column type
++		excludeTestsMatching 'org.hibernate.orm.test.mapping.javatime.GlobalJavaTimeJdbcTypeTests.testLocalDate'
++		excludeTestsMatching 'org.hibernate.orm.test.mapping.javatime.GlobalJavaTimeJdbcTypeTests.testLocalDateTime'
++		excludeTestsMatching 'org.hibernate.orm.test.mapping.javatime.GlobalJavaTimeJdbcTypeTests.testLocalTime'
++		excludeTestsMatching 'org.hibernate.orm.test.mapping.javatime.JavaTimeJdbcTypeTests.testLocalDate'
++		excludeTestsMatching 'org.hibernate.orm.test.mapping.javatime.JavaTimeJdbcTypeTests.testLocalDateTime'
++		excludeTestsMatching 'org.hibernate.orm.test.mapping.javatime.JavaTimeJdbcTypeTests.testLocalTime'
++
++        // Test breaks Hibernate's SQL generator
++        //excludeTestsMatching 'org.hibernate.orm.test.query.hql.set.SetOperationTest.testAlternatingSetOperator' // No such element exception
++
++        // Sequences failing - they work differently to other RDBMS
++        // includeTestsMatching 'org.hibernate.orm.test.secondarytable.HHH18813Test' 
++        // includeTestsMatching 'org.hibernate.orm.test.secondarytable.SecondaryRowTest' 
++        // includeTestsMatching 'org.hibernate.orm.test.id.enhanced.*'
++        // includeTestsMatching 'org.hibernate.orm.test.id.sequence.*'
++        // includeTestsMatching 'org.hibernate.orm.test.schemaupdate.idgenerator.SequenceGeneratorIncrementTest.*'
++        // includeTestsMatching 'org.hibernate.orm.test.batch.BatchSelectAndForceIncrementVersionTest.testBatchOptimisticForceIncrement'
++        // includeTestsMatching 'org.hibernate.orm.test.batch.BatchSelectAndForceIncrementVersionTest.testBatchPessimisticForceIncrement'
++		// includeTestsMatching 'SequenceMismatchStrategyDefaultExceptionTest.test'
++		// includeTestsMatching 'SequenceMismatchStrategyExceptionEnumTest.test'
++		// includeTestsMatching 'SequenceMismatchStrategyLogTest.test'
++
++        // We can't get runtime info about our sequences
++		excludeTestsMatching 'org.hibernate.orm.test.dialect.functional.SequenceInformationTest.test'
++
++        // Sequence table (used for sequence emulation) does set initial id to 1, but the test doesn't see it and fails
++		excludeTestsMatching 'org.hibernate.orm.test.id.SequenceGeneratorTest.testStartOfSequence'
++
++        // NuoDB does not allow the increment (quantum) value of a sequence to be negative - it must be 10 or greater
++        excludeTestsMatching 'org.hibernate.orm.test.id.sequence.NegativeValueSequenceTest.testNegativeOneAllocationSizeNoopOptimizer'
++        excludeTestsMatching 'org.hibernate.orm.test.id.sequence.NegativeValueSequenceTest.testNegativeTwoAllocationSizeNoopOptimizer'
++
++        // NuoDB does not support catalogs (test uses a Namespace - a schema/catalog pair).
++        excludeTestsMatching 'org.hibernate.orm.test.id.sequence.SequenceExportTest'
++
++        // Expects to find sequence SQL, but we don't support pooled sequences so an emulation table is used instead.
++        // The tests assume that sequence support also includes pooled sequence support, but for NuoDB it doesn't.
++		excludeTestsMatching 'org.hibernate.orm.test.id.enhanced.SequenceNamingStrategyTest'
++		excludeTestsMatching 'org.hibernate.orm.test.id.hhh12973.SequenceMismatchStrategyFixWithSequenceGeneratorTest.test'
++        excludeTestsMatching 'org.hibernate.orm.test.schemaupdate.idbag.IdBagSequenceTest'
++		excludeTestsMatching 'org.hibernate.orm.test.schemaupdate.idgenerator.SequenceGeneratorIncrementTest'
++		excludeTestsMatching 'org.hibernate.orm.test.schemaupdate.sequencegenerator.SequenceGeneratorOptionsTest'
++
++        // Cannot get previous value from a NuoDB sequence
++        excludeTestsMatching 'org.hibernate.orm.test.id.SequenceStyleGeneratorBehavesLikeSequenceHiloGeneratorWithZeroIncrementSizeTest'
++
++        //excludeTestsMatching 'org.hibernate.orm.test.bootstrap.scanning.PackagedEntityManagerTest' // Can't find persistence.xml files
++        //excludeTestsMatching 'org.hibernate.orm.test.bootstrap.scanning.ScannerTest' // Can't find orm.xml files
++
++        //includeTestsMatching 'org.hibernate.orm.test.filter.DynamicFilterTest.testFiltersOnMultiTableHqlDelete' // Undefined reference in DELETE
++        //includeTestsMatching 'org.hibernate.orm.test.filter.DynamicFilterTest.testFiltersOnSimpleHqlDelete' // Undefined reference in DELETE
++
++        // Why do these query tests fail?
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testColumnFunction' // Expected: <the string> but was: <null> 
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testImplicitCollectionJoinInSelects' // Expected: (a collection containing <0> and a collection containing <1>)  but: a collection containing <0> 
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testMaxGreatest' // Expected: <10> but was: <null> 
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testTupleInSubqueryResult' // Expected: <[true]> but was: <[false]> 
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testAggregateIndexElementKeyValueWithAlias' // No result found for query [select max(index(l)) from EntityOfLists eol join eol.listOfNumbers l group by eol] 
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testAggregateIndicesElementsWithPath' // NoReult No result found for query [select max(indices(eol.listOfNumbers)) from EntityOfLists eol] 
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testGroupByGroupingSets' // SQLGrammar JDBC exception executing SQL [select avg(eob1_0.the_double),eob1_0.gender,eob1_0.the_int from EntityOfBasics eob1_0 group by cube(eob1_0.gender,eob1_0.the_int)] [can't find function "CUBE"] [n/a] 
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testGroupByRollup' //SQLGrammar JDBC exception executing SQL [select avg(eob1_0.the_double),eob1_0.gender,eob1_0.the_int from EntityOfBasics eob1_0 group by rollup(eob1_0.gender,eob1_0.the_int)] [can't find function "ROLLUP"] [n/a] 
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testHyperbolic' // No result found for query [select sinh(e.theDouble) from EntityOfBasics e] 
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testImplicitCollectionJoinInSelectAggregate' // No result found for query [select max(index(eol.listOfNumbers)) from EntityOfLists eol group by eol] 
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testImplicitCollectionJoinInWhere' // No result found for query [from EntityOfLists eol join eol.listOfOneToMany se where element(se).someLong=5] 
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testKeyIndexValueEntry' // No result found for query [select index(l) from EntityOfLists eol join eol.listOfBasics l] 
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testMaxOverUnion' // SQLGrammar exception, expected end of statement got parenthesis
++                                       // select max(derived1_0.val) from (select se1_0.someLong from SIMPLE_ENTITY se1_0 union select se2_0.someInteger from SIMPLE_ENTITY se2_0) derived1_0^(val) 
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testMaxindexMaxelement' // NoResult No result found for query [select maxindex(eol.listOfBasics) from EntityOfLists eol] 
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testMoreIntervalDiffExpressions' // GenericJDBC JDBC exception executing SQL [select (DATE_ADD(CURRENT_TIMESTAMP, INTERVAL round(-(1000 * DATEDIFF(MICROSECOND /* No native using MICROSECOND*1000 */, {ts '1990-01-01 12:30:00.000000000'}, CURRENT_TIMESTAMP))/1000) MICROSECOND /* native unsupported */)) FROM Dual] [Too big interval -1113990001941297] [Too big interval -1113990001941297] 
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testOverlayFunction' // IndexOutOfBounds Index 0 out of bounds for length 0 
++
++
++        // --------------------------------------------
++        // Tests to skip due to known NuoDB limitations
++        // --------------------------------------------
++
++        // Does the NuoDB JDBC JAR support NClob, NString ... ?
++        if (nuodbJdbcJarVersion.compareTo("24.2.2") < 0) {
++            println "hibernate-core.gradle: Excluding tests of Nationalized columns"
++            excludeTestsMatching 'org.hibernate.orm.test.jpa.query.NativeQueryResultTypeAutoDiscoveryTest.commonTextTypes'
++            excludeTestsMatching 'org.hibernate.orm.test.mapping.basic.NClobCharArrayTest'
++            excludeTestsMatching 'org.hibernate.orm.test.mapping.basic.NClobStringTest'
++            excludeTestsMatching 'org.hibernate.orm.test.mapping.basic.NationalizedTest'
++            excludeTestsMatching 'org.hibernate.orm.test.mapping.basic.StringNationalizedMappingTests'
++            excludeTestsMatching 'org.hibernate.orm.test.mapping.basic.NClobTest.test'
++            excludeTestsMatching 'org.hibernate.orm.test.nationalized.NationalizedLobFieldTest'
++            excludeTestsMatching 'org.hibernate.orm.test.type.LobUnfetchedPropertyTest.testNClob'
++        } else {
++            println "hibernate-core.gradle: Including tests of Nationalized columns"
++        }
++
++        if (nuodbDatabaseVersion.isBefore(7,0,0)) {
++            println "hibernate-core.gradle: Excluding tests using NuoDB 7 features"
++
++            // FULL OUTER JOIN not supported until NuoDB 7
++            excludeTestsMatching 'org.hibernate.orm.test.inheritance.EntityJoinWithJoinedInheritanceTest.testFullJoin'
++            excludeTestsMatching 'org.hibernate.orm.test.inheritance.EntityJoinWithSingleTableInheritanceTest.testFullJoin'
++            excludeTestsMatching 'org.hibernate.orm.test.inheritance.EntityJoinWithTablePerClassInheritanceTest.testFullJoin'
++            excludeTestsMatching 'org.hibernate.orm.test.join.OuterJoinTest.testJoinOrderWithFullJoin'
++            excludeTestsMatching 'org.hibernate.orm.test.join.OuterJoinTest.testJoinOrderWithFullJoinWithIdDereference'
++            excludeTestsMatching 'org.hibernate.orm.test.join.OuterJoinTest.testJoinOrderWithFullNormalJoin'
++            excludeTestsMatching 'org.hibernate.orm.test.join.OuterJoinTest.testJoinOrderWithFullNormalJoinWithIdDereference'
++            excludeTestsMatching 'org.hibernate.orm.test.mapping.inheritance.joined.JoinedSubclassTest.testJoinedSubclass'
++            excludeTestsMatching 'org.hibernate.orm.test.inheritance.join.AttributeJoinWith*.testFullJoin'
++            excludeTestsMatching 'org.hibernate.orm.test.query.RightJoinNullnessPredicateQueryTest.testDereferenceIsNull'
++            excludeTestsMatching 'org.hibernate.orm.test.query.RightJoinNullnessPredicateQueryTest.testFullJoinIsNull'
++            excludeTestsMatching 'org.hibernate.orm.test.query.SelectForeignKeyWithMissingFromTest.testFullJoin'
++            excludeTestsMatching 'org.hibernate.orm.test.query.SelectForeignKeyWithMissingFromTest.testFullJoinEntityPath'
++
++            // Not until NuoDB 7 for window functions var_samp(), rank() ...
++            excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testStatisticalFunctions'
++            excludeTestsMatching 'org.hibernate.orm.test.hql.HQLTest.test_var_function_example'
++            excludeTestsMatching 'org.hibernate.orm.test.query.criteria.CriteriaWindowFunctionTest.testRank'
++            excludeTestsMatching 'org.hibernate.orm.test.query.hql.WindowFunctionTest.testOrderByAndAlias'
++            excludeTestsMatching 'org.hibernate.orm.test.query.hql.WindowFunctionTest.testRank'
++            excludeTestsMatching 'org.hibernate.orm.test.jpa.query.CorrelationCteDerivedRootTest.tesDerivedRoot'
++		    excludeTestsMatching 'org.hibernate.orm.test.query.hql.InsertSelectTests.testInsertSelectDistinct'
++
++            // INTERSECT and EXCEPT 
++            //excludeTestsMatching 'org.hibernate.orm.test.bootstrap.binding.annotations.embedded.EmbeddedTest.testQueryWithEmbeddedParameterAllNull'
++            //excludeTestsMatching 'org.hibernate.orm.test.bootstrap.binding.annotations.embedded.EmbeddedTest.testQueryWithEmbeddedParameterOneNull'
++		    excludeTestsMatching 'org.hibernate.orm.test.hql.HQLTest.test_hql_derived_join_example'
++
++		    excludeTestsMatching 'org.hibernate.orm.test.jpa.criteria.CriteriaQualifiedJoinTest.testJoinLateral'   // emulation -> unsupported SQL construct
++
++            excludeTestsMatching 'org.hibernate.orm.test.query.SubQueryInFromEmbeddedIdTests.testEntity'
++            excludeTestsMatching 'org.hibernate.orm.test.query.SubQueryInFromEmbeddedIdTests.testEntityImplicit'
++            excludeTestsMatching 'org.hibernate.orm.test.query.SubQueryInFromEmbeddedIdTests.testEntityJoin'
++
++            excludeTestsMatching 'org.hibernate.orm.test.query.SubQueryInFromIdClassTests.testEntity'
++            excludeTestsMatching 'org.hibernate.orm.test.query.SubQueryInFromIdClassTests.testEntityImplicit'
++            excludeTestsMatching 'org.hibernate.orm.test.query.SubQueryInFromIdClassTests.testEntityJoin'
++
++            excludeTestsMatching 'org.hibernate.orm.test.query.SubQueryInFromInverseOneEmbeddedIdTests.testEntity'
++            excludeTestsMatching 'org.hibernate.orm.test.query.SubQueryInFromInverseOneEmbeddedIdTests.testEntityImplicit'
++            excludeTestsMatching 'org.hibernate.orm.test.query.SubQueryInFromInverseOneEmbeddedIdTests.testEntityJoin'
++
++            excludeTestsMatching 'org.hibernate.orm.test.query.SubQueryInFromInverseOneIdClassTests.testEntity'
++            excludeTestsMatching 'org.hibernate.orm.test.query.SubQueryInFromInverseOneIdClassTests.testEntityImplicit'
++            excludeTestsMatching 'org.hibernate.orm.test.query.SubQueryInFromInverseOneIdClassTests.testEntityJoin'
++
++            excludeTestsMatching 'org.hibernate.orm.test.query.SubQueryInFromInverseOneTests.testEntity'
++            excludeTestsMatching 'org.hibernate.orm.test.query.SubQueryInFromInverseOneTests.testEntityImplicit'
++            excludeTestsMatching 'org.hibernate.orm.test.query.SubQueryInFromInverseOneTests.testEntityJoin'
++
++            excludeTestsMatching 'org.hibernate.orm.test.query.SubQueryInFromManyToManyEmbeddedIdTests.testEntity'
++            excludeTestsMatching 'org.hibernate.orm.test.query.SubQueryInFromManyToManyEmbeddedIdTests.testEntityImplicit'
++            excludeTestsMatching 'org.hibernate.orm.test.query.SubQueryInFromManyToManyEmbeddedIdTests.testEntityJoin'
++
++            excludeTestsMatching 'org.hibernate.orm.test.query.SubQueryInFromManyToManyIdClassTests.testEntity'
++            excludeTestsMatching 'org.hibernate.orm.test.query.SubQueryInFromManyToManyIdClassTests.testEntityImplicit'
++            excludeTestsMatching 'org.hibernate.orm.test.query.SubQueryInFromManyToManyIdClassTests.testEntityJoin'
++
++            excludeTestsMatching 'org.hibernate.orm.test.query.SubQueryInFromManyToManyTests.testEntity'
++            excludeTestsMatching 'org.hibernate.orm.test.query.SubQueryInFromManyToManyTests.testEntityImplicit'
++            excludeTestsMatching 'org.hibernate.orm.test.query.SubQueryInFromManyToManyTests.testEntityJoin'
++
++            excludeTestsMatching 'org.hibernate.orm.test.query.SubQueryInFromOneToManyEmbeddedIdTests.testEntity'
++            excludeTestsMatching 'org.hibernate.orm.test.query.SubQueryInFromOneToManyEmbeddedIdTests.testEntityImplicit'
++            excludeTestsMatching 'org.hibernate.orm.test.query.SubQueryInFromOneToManyEmbeddedIdTests.testEntityJoin'
++
++            excludeTestsMatching 'org.hibernate.orm.test.query.SubQueryInFromOneToManyIdClassTests.testEntity'
++            excludeTestsMatching 'org.hibernate.orm.test.query.SubQueryInFromOneToManyIdClassTests.testEntityImplicit'
++            excludeTestsMatching 'org.hibernate.orm.test.query.SubQueryInFromOneToManyIdClassTests.testEntityJoin'
++
++            excludeTestsMatching 'org.hibernate.orm.test.query.SubQueryInFromOneToManyTests.testEntity'
++            excludeTestsMatching 'org.hibernate.orm.test.query.SubQueryInFromOneToManyTests.testEntityImplicit'
++            excludeTestsMatching 'org.hibernate.orm.test.query.SubQueryInFromOneToManyTests.testEntityJoin'
++
++            excludeTestsMatching 'org.hibernate.orm.test.query.SubQueryInFromTests.testBasic'
++            excludeTestsMatching 'org.hibernate.orm.test.query.SubQueryInFromTests.testEmbedded'
++            excludeTestsMatching 'org.hibernate.orm.test.query.SubQueryInFromTests.testEntity'
++            excludeTestsMatching 'org.hibernate.orm.test.query.SubQueryInFromTests.testEntityImplicit'
++            excludeTestsMatching 'org.hibernate.orm.test.query.SubQueryInFromTests.testEntityJoin'
++
++            // CASE ... IN (...) weirdness
++            excludeTestsMatching 'org.hibernate.orm.test.hql.HQLTest.test_hql_in_predicate_example_1'
++            excludeTestsMatching 'org.hibernate.orm.test.jpa.ql.TreatKeywordTest.testFilteringJoinedSubclasses'
++        } else {
++            println "hibernate-core.gradle: Running tests using NuoDB 7 features"
++        }
++
++        if (nuodbDatabaseVersion.isBefore(7,0,2)) {
++            println "hibernate-core.gradle: Excluding tests needing HELPER_TYPE column"
++
++            // JIRA DB-40465: Can't create table with HELPER_TYPE column. FIXED in 7.0.2
++            excludeTestsMatching 'org.hibernate.orm.test.jpa.criteria.idclass.IdClassPredicateTest.testCountIdClassAttributes'
++            excludeTestsMatching 'org.hibernate.orm.test.jpa.criteria.idclass.IdClassPredicateTest.testDeclaredIdClassAttributes'
++            excludeTestsMatching 'org.hibernate.orm.test.jpa.criteria.idclass.IdClassPredicateTest.testSupertypeIdClassAttributes'
++
++            // JIRA DB-40458: CASE statement weirdness cast(? AS VARCHAR (2147483647)). FIXED in 7.0.2
++		    excludeTestsMatching 'org.hibernate.orm.test.query.hql.CaseStatementTest.testSearchedCaseStatementWithAllParamResults'
++        } else {
++            println "hibernate-core.gradle: Running tests needing HELPER_TYPE column"
++        }
++
++        // WEEK not implememted for extract()
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testExtractFunctionWeek'
++        //includeTestsMatching 'org.hibernate.orm.test.query.hql.StandardFunctionTests.testExtractFunction' // test modified to skip WEEK Tests 
++	    //includeTestsMatching 'org.hibernate.orm.test.query.hql.StandardFunctionTests.testExtractFunctionWithAssertions' // test modified to skip WEEK Tests 
++
++        // Row number with 'ties' not supported. Requires dense_rank() apparently, but still fails
++        excludeTestsMatching 'org.hibernate.orm.test.pagination.FetchClausePaginationTest.testFetchWithTies'
++
++        // NuoDB quietly casts a boolean to a string, so the code runs without the expected exception
++        // Most databases do this and also exclude these tests
++        //excludeTestsMatching 'org.hibernate.orm.test.filter.FilterParameterTests.testYesNoMismatch'
++        //excludeTestsMatching 'org.hibernate.orm.test.filter.FilterParameterTests.testNumericMismatch'
++
++        // No support for first_value, nth_value, percent_rank, cume_dist()
++		excludeTestsMatching 'org.hibernate.orm.test.query.criteria.CriteriaWindowFunctionTest.testFrame'
++		excludeTestsMatching 'org.hibernate.orm.test.query.criteria.CriteriaWindowFunctionTest.testFirstValue'
++		excludeTestsMatching 'org.hibernate.orm.test.query.criteria.CriteriaWindowFunctionTest.testReusableWindow'
++		excludeTestsMatching 'org.hibernate.orm.test.query.criteria.CriteriaWindowFunctionTest.testNthValue'
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.WindowFunctionTest.testFrame'
++
++        // NuoDB requires ORDER BY with some window-functions
++		excludeTestsMatching 'org.hibernate.orm.test.query.criteria.CriteriaWindowFunctionTest.testRowNumberWithoutOrder'
++		excludeTestsMatching 'org.hibernate.orm.test.query.criteria.CriteriaTimeoutTest.testCreateMutationQueryCriteriaInsertSelect'
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.WindowFunctionTest.testRowNumberWithoutOrder'
++		excludeTestsMatching 'org.hibernate.orm.test.query.criteria.InsertSelectTests.simpleTest'
++
++        // Table and column names must be unique. Even if quoted, "Table1" and "TABLE1" are considered the same.
++        excludeTestsMatching 'org.hibernate.orm.test.schemaupdate.SchemaUpdateTest'
++
++        // sign() function in @Formula annotation is used as-is - the registered emulation is ignored
++        //excludeTestsMatching 'FormulaWithPartitionByTest'
++
++        // TIMESTAMP precision is always 6 (MICROSECONDS)
++        excludeTestsMatching 'org.hibernate.orm.test.temporal.FractionalSecondsTests.testUsage0'  // Expects precision(0)
++        excludeTestsMatching 'org.hibernate.orm.test.temporal.FractionalSecondsTests.testUsage3'  // Expects precision(3)
++        //excludeTestsMatching 'org.hibernate.orm.test.temporal.FractionalSecondsTests.testUsage9'
++        excludeTestsMatching 'org.hibernate.orm.test.temporal.JavaTimeFractionalSecondsTests.testUsage0'  // Expects precision(0)
++        excludeTestsMatching 'org.hibernate.orm.test.temporal.JavaTimeFractionalSecondsTests.testUsage3'  // Expects precision(3)
++        //excludeTestsMatching 'org.hibernate.orm.test.temporal.JavaTimeFractionalSecondsTests.testUsage9'
++
++        // CASCADE DELETE not supported
++        excludeTestsMatching 'ManyToManyBidirectionalTest.testRemoveMappedBySide'
++    	excludeTestsMatching 'org.hibernate.orm.test.tondelete.toone.ToOneOnDeleteTest.testManyToOne'
++
++        // Dependent Right Outer Join not supported even in 7
++        excludeTestsMatching 'org.hibernate.orm.test.join.OuterJoinTest.testJoinOrderWithRightJoinWithInnerImplicitJoins'
++        //excludeTestsMatching 'org.hibernate.orm.test.join.OuterJoinTest.testJoinOrderWithFullJoin'
++
++        // No support for UPDATE ... ON CONFLICT
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.InsertConflictTests'
++
++        // Type implementation mismatches
++        excludeTestsMatching 'org.hibernate.orm.test.jpa.query.NativeQueryResultTypeAutoDiscoveryTest.tinyintType'  // No support for the tinyint datatype so we use smallint
++        excludeTestsMatching 'org.hibernate.orm.test.jpa.query.NativeQueryResultTypeAutoDiscoveryTest.floatType'  // Stores all floating point numbers as double, never returns a float
++        excludeTestsMatching 'org.hibernate.orm.test.jpa.query.NativeQueryResultTypeAutoDiscoveryTest.realType'  // Stores all floating point numbers as double, never returns a float
++        excludeTestsMatching 'org.hibernate.orm.test.jpa.query.NativeQueryResultTypeAutoDiscoveryTest.numericType'  // Value is too big for the maximum allowed precision of NuoDB
++        excludeTestsMatching 'org.hibernate.orm.test.jpa.query.NativeQueryResultTypeAutoDiscoveryTest.decimalType'  // Value is too big for the maximum allowed precision of NuoDB
++        excludeTestsMatching 'org.hibernate.orm.test.jpa.query.NativeQueryResultTypeAutoDiscoveryTest.binaryTypes'  // NuoDB maps BINARY and VARBINARY to BLOB
++        excludeTestsMatching 'org.hibernate.orm.test.jpa.query.NativeQueryResultTypeAutoDiscoveryTest.longBinaryType'  // NuoDB maps LONGVARCHAR to BLOB
++
++        // JIRA DB-37128: NuoDB Byte cannot be set to a negative value using a PreparedStatement. OPEN
++        excludeTestsMatching 'org.hibernate.orm.test.typedescriptor.ByteTest.testByteDataPersistenceAndRetrieval'
++
++        // NuoDB has no UUID type
++		excludeTestsMatching 'org.hibernate.orm.test.tenantidpk.TenantPkTest'
++
++        // NuoDB requires ORDER BY whenever GROUP BY  is used. This generates a query without.
++		excludeTestsMatching 'org.hibernate.orm.test.query.hql.InsertSelectTests.testInsertSelectGroupBy'
++
++
++        // JIRA DB-40459: Problem with atan2, FIXED in NuoDB 7.0.2
++        // Dialect modified to swap arguments in earlier releases.
++        // if (nuodbDatabaseVersion.isAfter("7.0.1"))
++        //     excludeTestsMatching 'CriteriaBuilderNonStandardFunctionsTest.testAtan2'
++
++        // NuoDB does not use Catalogs
++        excludeTestsMatching 'org.hibernate.orm.test.boot.database.qualfiedTableNaming.DefaultCatalogAndSchemaTest.updateSchema_fromSessionFactory'
++
++        // NuoDB does not take read locks
++        excludeTestsMatching 'org.hibernate.orm.test.jpa.LockTest.testUpdateWithPessimisticReadLockSkipLocked'  
++    	//excludeTestsMatching 'org.hibernate.orm.test.locking.jpa.FollowOnLockingTest.testQueryLockingWithFollowOn'
++    	excludeTestsMatching 'org.hibernate.orm.test.locking.jpa.FollowOnLockingTest.testQueryLockingWithoutFollowOn'
++
++        // Functions NuoDB doesn't support
++        excludeTestsMatching 'org.hibernate.orm.test.query.criteria.CriteriaBuilderNonStandardFunctionsTest.testLog' // LOG() not supported
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testMathFunctions' // ln() not implemented
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testHexFunction'  // hex() not implemented
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testMedian'  // median() not supported
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.StandardFunctionTests.testLog' // log() not implemented
++        //excludeTestsMatching 'org.hibernate.orm.test.query.hql.StandardFunctionTests.testMathFunctions' // ln() not implemented, test modified to skip it
++
++        // Miscellaneous behaviours NuoDB doesn't support
++        excludeTestsMatching 'org.hibernate.orm.test.jpa.query.NamedQueryCommentTest' // our query hints go after select/update not before
++		excludeTestsMatching 'org.hibernate.orm.test.query.criteria.internal.NullPrecedenceTest.testNullPrecedence'  // NuoDB does not support NULL precedence
++
++        // Function tests that NuoDB can't support
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testCastBinaryWithLength'  // NuoDB doesn't automatically truncate
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testCastFunction' // NuoDB doesn't automatically truncate. No result found for query [select cast(e.theBoolean as String) from EntityOfBasics e] 
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testAddSecondsWithFractionalPart' // Loses fractional part
++
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testCastStringToBoolean' // SELECT ... UNION  SELECT  without FROM not supported 
++                            // select (select v.x from (select true x ^union all select false) v left join (select 't' k,true v union all select 'true',true union all select 'y',true union all select '1',true union all select 'f',false union all select 'false',false union all select 'n',false union all select '0',false) t on lower('1')=t.k where t.v is null or v.x=t.v) FROM Dual 
++
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testDateTruncWithOffsetFunction' // Expected: one of {<1974-10-03T00:00-12:00>, <1974-10-04T00:00Z>} but: was <1974-10-03T23:00Z> 
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testDurationArithmeticWithLiterals' // Expected: <PT120H> but was: <null> 
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testDurationSubtractionWithDatetimeLiterals' // Expected: <PT840H> but was: <null> 
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testDurationArithmeticOverflowing'  // Numeric overflow
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testDurationBy' // No result found for query [select e.theDuration from EntityOfBasics e] 
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testDurationCast' //  No result found for query [select cast(e.theDuration as Long) from EntityOfBasics e] 
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testDurationLiterals' //  No result found for query [select e.theDuration from EntityOfBasics e] 
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testExtractFunctionTimeZone' // SQLGrammar exception unexpected timezone_hour
++                                       // select extract(^timezone_hour from eob1_0.the_zoned_date_time) from EntityOfBasics eob1_0 
++        //excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testExtractFunctionWithAssertions' // IndexOutOfBounds Index 0 out of bounds for length 0 
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.FunctionTests.testExtractOffsetHourMinute' //SQLGrammar JDBC exception
++                                       // select extract(^timezone_hour from {ts '2024-02-05 09:18:12.000000000'}) FROM Dual 
++
++        // Expected not <null>.  Was: can't use a DATE as a TIME
++        excludeTestsMatching 'org.hibernate.orm.test.temporal.TimePropertyTest'
++
++        // No support for TIMESTAMP_WITH_TIME_ZONE
++		excludeTestsMatching 'org.hibernate.orm.test.instant.InstantTest.testStorage'
++		excludeTestsMatching 'org.hibernate.orm.test.instant.InstantWithNormalizedTest.test'
++
++        // WITH (a, b, ...) AS (subquery) is illegal syntax
++        excludeTestsMatching 'org.hibernate.orm.test.hql.HQLTest.test_hql_cte_materialized_example'
++        excludeTestsMatching 'org.hibernate.orm.test.jpa.criteria.cte.CriteriaCteCopyTest.testValidRootQuery'
++        excludeTestsMatching 'org.hibernate.orm.test.jpa.criteria.cte.CriteriaCteCopyTest.testValidSubQuery'
++        excludeTestsMatching 'org.hibernate.orm.test.jpa.query.CorrelationCteDerivedJoinTest.tesCte'
++        excludeTestsMatching 'org.hibernate.orm.test.jpa.query.CorrelationCteDerivedJoinTest.tesDerivedJoin'
++        excludeTestsMatching 'org.hibernate.orm.test.jpa.query.CorrelationCteDerivedRootTest.tesCte'
++		excludeTestsMatching 'org.hibernate.orm.test.query.CteTests.testInSubquery' // Returns more than one row
++		excludeTestsMatching 'org.hibernate.orm.test.query.CteTests.testSubquery'   // emulation -> unsupported SQL construct
++        excludeTestsMatching 'org.hibernate.orm.test.query.CteTests.testBasic'
++        excludeTestsMatching 'org.hibernate.orm.test.query.CteTests.testBasicJoined'
++        excludeTestsMatching 'org.hibernate.orm.test.query.CteTests.testMaterialized'
++        excludeTestsMatching 'org.hibernate.orm.test.query.CteTests.testNested'
++        excludeTestsMatching 'org.hibernate.orm.test.query.criteria.CriteriaCteOffsetFetchTest'
++        excludeTestsMatching 'org.hibernate.orm.test.query.criteria.CriteriaCteUnionTest'
++        excludeTestsMatching 'org.hibernate.orm.test.query.sqm.SelfRenderingSqmFunctionWithoutArgumentsTest.test'
++        excludeTestsMatching 'org.hibernate.orm.test.subquery.MultipleIdenticalColumnsInSubqueryTest.CTE_with_same_column_selected_twice'
++
++        // IS [NOT] DISTINCT FROM not supported
++        //excludeTestsMatching 'org.hibernate.orm.test.bootstrap.binding.annotations.embedded.EmbeddedTest.testQueryWithEmbeddedParameterOneNull'
++        //excludeTestsMatching 'org.hibernate.orm.test.bootstrap.binding.annotations.embedded.EmbeddedTest.testQueryWithEmbeddedParameterAllNull' 
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.DistinctFromTest.testNotDistinctFromNullParam'
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.DistinctFromTest.testNotDistinctFromStringParam'
++        excludeTestsMatching 'org.hibernate.orm.test.type.VarbinaryArrayTest'
++        excludeTestsMatching 'org.hibernate.orm.test.type.BasicListTest.testQuery'
++        excludeTestsMatching 'org.hibernate.orm.test.type.BasicSortedSetTest.testQuery'
++        excludeTestsMatching 'org.hibernate.orm.test.type.BooleanArrayTest.testQuery'
++        excludeTestsMatching 'org.hibernate.orm.test.type.DateArrayTest.testQuery'
++        excludeTestsMatching 'org.hibernate.orm.test.type.DoubleArrayTest.testQuery'
++        excludeTestsMatching 'org.hibernate.orm.test.type.EnumArrayTest.testQuery'
++        excludeTestsMatching 'org.hibernate.orm.test.type.EnumSetConverterTest.testQuery'
++        excludeTestsMatching 'org.hibernate.orm.test.type.EnumSetTest.testQuery'
++        excludeTestsMatching 'org.hibernate.orm.test.type.FloatArrayTest.testQuery'
++        excludeTestsMatching 'org.hibernate.orm.test.type.IntegerArrayTest.testQuery'
++        excludeTestsMatching 'org.hibernate.orm.test.type.LongArrayTest.testQuery'
++        excludeTestsMatching 'org.hibernate.orm.test.type.ShortArrayTest.testQuery'
++        excludeTestsMatching 'org.hibernate.orm.test.type.TimeArrayTest.testQuery'
++        excludeTestsMatching 'org.hibernate.orm.test.type.TimestampArrayTest.testQuery'
++		excludeTestsMatching 'org.hibernate.orm.test.query.hql.DistinctFromTest'
++
++        // Subqueries in ORDER BY clause
++        excludeTestsMatching 'org.hibernate.orm.test.hql.size.filter.WhereAnnotatedOneToManySizeTest.orderBy_sizeOf'
++		excludeTestsMatching 'org.hibernate.orm.test.query.hql.SubqueryOperatorsTest.testSubqueryInVariousClauses'
++
++        // Multi-column value only allowed in comparison operators
++        // excludeTestsMatching 'org.hibernate.orm.test.annotations.cid.CompositeIdTest'
++        // excludeTestsMatching 'org.hibernate.orm.test.annotations.cid.HierarchicalCompositeIdLazyTest'
++        // excludeTestsMatching 'org.hibernate.orm.test.annotations.collectionelement.EmbeddableElementCollectionMemberOfTest'
++        // excludeTestsMatching 'org.hibernate.orm.test.annotations.derivedidentities.bidirectional.CompositeIdDerivedIdWithIdClassTest'
++        // excludeTestsMatching 'org.hibernate.orm.test.hql.HQLTest.test_hql_in_predicate_example_6'
++
++        // ResultSet is forward-only
++        excludeTestsMatching 'org.hibernate.orm.test.hql.ScrollableCollectionFetchingTest.testScrollingJoinFetchesEmptyResultSet'
++        excludeTestsMatching 'org.hibernate.orm.test.hql.ScrollableCollectionFetchingTest.testScrollingJoinFetchesPositioning'
++        excludeTestsMatching 'org.hibernate.orm.test.hql.ScrollableCollectionFetchingTest.testScrollingJoinFetchesReverse'
++        excludeTestsMatching 'org.hibernate.orm.test.hql.ScrollableCollectionFetchingTest.testScrollingJoinFetchesSingleRowResultSet'
++        excludeTestsMatching 'org.hibernate.orm.test.jpa.criteria.fetchscroll.CriteriaToScrollableResultsFetchTest.testWithScroll'
++        excludeTestsMatching 'org.hibernate.orm.test.resulttransformer.ResultTransformerTest'
++
++        // Scrollable ResultSets not supported
++        excludeTestsMatching 'org.hibernate.orm.test.query.sqm.BasicSelectionQueryTests.rawEntitySelectTest'
++        excludeTestsMatching 'org.hibernate.orm.test.query.sqm.BasicSelectionQueryTests.rawNamedSelectTest'
++        excludeTestsMatching 'org.hibernate.orm.test.query.sqm.BasicSelectionQueryTests.rawScalarSelectTest'
++        excludeTestsMatching 'org.hibernate.orm.test.query.sqm.BasicSelectionQueryTests.tupleSelectionTest'
++        excludeTestsMatching 'org.hibernate.orm.test.query.sqm.BasicSelectionQueryTests.tupleSelectionTestBaseline'
++        excludeTestsMatching 'org.hibernate.orm.test.query.sqm.BasicSelectionQueryTests.typedEntitySelectTest'
++        excludeTestsMatching 'org.hibernate.orm.test.query.sqm.BasicSelectionQueryTests.typedScalarSelectTest'
++        excludeTestsMatching 'org.hibernate.orm.test.query.sqm.BasicSelectionQueryTests.typesNamedSelectTest'
++        excludeTestsMatching 'org.hibernate.orm.test.query.returns.ScrollableResultsTests'
++        excludeTestsMatching 'org.hibernate.orm.test.hql.ScrollableCollectionFetchingTest.testScrollingNoJoinFetchesPositioning'
++
++        // CREATE TABLE ... COMMENT not supported, nor is COMMENT ON
++        excludeTestsMatching 'org.hibernate.orm.test.schemaupdate.TableCommentTest'
++
++        // ALL not supported
++        excludeTestsMatching 'org.hibernate.orm.test.hql.HQLTest.test_hql_collection_expressions_example_8'
++        excludeTestsMatching 'org.hibernate.orm.test.hql.HQLTest.test_hql_all_subquery_comparison_qualifier_example'
++		excludeTestsMatching 'org.hibernate.orm.test.query.criteria.SubQueryTests.modifiedSubQueryHqlTest'
++		excludeTestsMatching 'org.hibernate.orm.test.query.criteria.SubQueryTests.modifiedSubQueryTest'
++        excludeTestsMatching 'org.hibernate.orm.test.jpa.criteria.subquery.UncorrelatedSubqueryTest.testEqualAll'
++
++        // Any(sub-query) not supported, emulation with min/max also fails because sub-query in max/min also not supported 
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.SubqueryOperatorsTest.testAny' // any(sub-query) not supported
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.SubqueryOperatorsTest.testEvery'
++        excludeTestsMatching 'org.hibernate.orm.test.hql.HQLTest.test_hql_collection_expressions_example_5' // any(sub-query) not supported
++
++        // Integrity contraints, FKs not enforced
++        excludeTestsMatching 'org.hibernate.orm.test.annotations.refcolnames.constraints.OneToManyRefColumnNameTest.testForeignKey'
++        excludeTestsMatching 'org.hibernate.orm.test.exception.SQLExceptionConversionTest.testIntegrityViolation'
++        excludeTestsMatching 'org.hibernate.orm.test.jpa.exception.ExceptionTest.testConstraintViolationException'
++        excludeTestsMatching 'org.hibernate.orm.test.constraint.ConstraintInterpretationTest.testForeignKey'
++        excludeTestsMatching 'org.hibernate.orm.test.constraint.ConstraintInterpretationTest2.testForeignKey'
++
++        // Cross JOIN not supported
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.JpaCrossJoinTests.test2Roots'
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.JpaCrossJoinTests.test2Roots2'
++        excludeTestsMatching 'org.hibernate.orm.test.query.hql.JpaCrossJoinTests.testCrossJoin'
++    }
++}
++// END: For NUODB
++
+ 
+ dependencies {
+     api jakartaLibs.jpa
+diff --git a/hibernate-core/src/test/java/org/hibernate/orm/test/annotations/lob/VersionedBook.java b/hibernate-core/src/test/java/org/hibernate/orm/test/annotations/lob/VersionedBook.java
+index 2ce7046ea1..4cffa480eb 100644
+--- a/hibernate-core/src/test/java/org/hibernate/orm/test/annotations/lob/VersionedBook.java
++++ b/hibernate-core/src/test/java/org/hibernate/orm/test/annotations/lob/VersionedBook.java
+@@ -31,7 +31,7 @@ public void setId(Integer id) {
+ 	}
+ 
+ 	@Version
+-	@Column(name = "ver")
++	@Column(name = "verx")  // NUODB ver is a reserved word until V8
+ 	public Integer getVersion() {
+ 		return version;
+ 	}
+diff --git a/hibernate-core/src/test/java/org/hibernate/orm/test/annotations/lob/VersionedCompiledCode.java b/hibernate-core/src/test/java/org/hibernate/orm/test/annotations/lob/VersionedCompiledCode.java
+index 68a540e9bf..f15f675c67 100644
+--- a/hibernate-core/src/test/java/org/hibernate/orm/test/annotations/lob/VersionedCompiledCode.java
++++ b/hibernate-core/src/test/java/org/hibernate/orm/test/annotations/lob/VersionedCompiledCode.java
+@@ -31,7 +31,7 @@ public void setId(Integer id) {
+ 	}
+ 
+ 	@Version
+-	@Column(name = "ver")
++	@Column(name = "verx")  // NUODB ver is a reserved word until V8
+ 	public Integer getVersion() {
+ 		return version;
+ 	}
+diff --git a/hibernate-core/src/test/java/org/hibernate/orm/test/annotations/manytomany/ManyToManyInverseJoinColumnSortedSetTest.java b/hibernate-core/src/test/java/org/hibernate/orm/test/annotations/manytomany/ManyToManyInverseJoinColumnSortedSetTest.java
+index 0c0f390c3b..d18e4e89e1 100644
+--- a/hibernate-core/src/test/java/org/hibernate/orm/test/annotations/manytomany/ManyToManyInverseJoinColumnSortedSetTest.java
++++ b/hibernate-core/src/test/java/org/hibernate/orm/test/annotations/manytomany/ManyToManyInverseJoinColumnSortedSetTest.java
+@@ -83,7 +83,7 @@ public void testDefault(SessionFactoryScope scope) {
+ 		} );
+ 	}
+ 
+-	@Entity(name = "containing")
++	@Entity(name = "xcontaining") // NuoDB: 'containing' is reserved word
+ 	public static class ContainingEntity {
+ 		@Id
+ 		private Integer id;
+diff --git a/hibernate-core/src/test/java/org/hibernate/orm/test/batch/BatchOptimisticLockingTest.java b/hibernate-core/src/test/java/org/hibernate/orm/test/batch/BatchOptimisticLockingTest.java
+index a0471e83b5..16909352f9 100644
+--- a/hibernate-core/src/test/java/org/hibernate/orm/test/batch/BatchOptimisticLockingTest.java
++++ b/hibernate-core/src/test/java/org/hibernate/orm/test/batch/BatchOptimisticLockingTest.java
+@@ -103,7 +103,11 @@ public void testBatchAndOptimisticLocking(SessionFactoryScope scope) {
+ 			var msg = "could not execute batch";
+ 			assertThat( exception.getMessage() ).contains( msg );
+ 		}
+-		else {
++		// NUODB: START  Our message is not as detailed
++		else if (dialect.getClass().getPackage().getName().equals("com.nuodb.hibernate")) {
++			assertThat(exception.getMessage()).startsWith("Batch update returned unexpected row count from update");
++		// NUODB: END
++		} else {
+ 			assertThat( exception ).isInstanceOf( OptimisticLockException.class );
+ 
+ 			if ( dialect instanceof MariaDBDialect && getDialect().getVersion().isAfter( 11, 6, 2 ) ) {
+diff --git a/hibernate-core/src/test/java/org/hibernate/orm/test/batch/OptionalSecondaryTableBatchTest.java b/hibernate-core/src/test/java/org/hibernate/orm/test/batch/OptionalSecondaryTableBatchTest.java
+index dafb79d44c..4839ee398c 100644
+--- a/hibernate-core/src/test/java/org/hibernate/orm/test/batch/OptionalSecondaryTableBatchTest.java
++++ b/hibernate-core/src/test/java/org/hibernate/orm/test/batch/OptionalSecondaryTableBatchTest.java
+@@ -100,7 +100,7 @@ public static class Company {
+ 		private int id;
+ 
+ 		@Version
+-		@Column( name = "ver" )
++		@Column( name = "xver") // NuoDB: ver reserved word
+ 		private int version;
+ 
+ 		private String name;
+diff --git a/hibernate-core/src/test/java/org/hibernate/orm/test/boot/database/metadata/MetadataAccessTests.java b/hibernate-core/src/test/java/org/hibernate/orm/test/boot/database/metadata/MetadataAccessTests.java
+index 3ce22d692d..ee25c738db 100644
+--- a/hibernate-core/src/test/java/org/hibernate/orm/test/boot/database/metadata/MetadataAccessTests.java
++++ b/hibernate-core/src/test/java/org/hibernate/orm/test/boot/database/metadata/MetadataAccessTests.java
+@@ -5,7 +5,6 @@
+ package org.hibernate.orm.test.boot.database.metadata;
+ 
+ import static org.assertj.core.api.Assertions.assertThat;
+-import static org.hibernate.dialect.SimpleDatabaseVersion.ZERO_VERSION;
+ import static org.hibernate.internal.CoreMessageLogger.CORE_LOGGER;
+ import static org.junit.jupiter.api.Assertions.fail;
+ 
+@@ -19,20 +18,9 @@
+ import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
+ import org.hibernate.cfg.AvailableSettings;
+ import org.hibernate.cfg.JdbcSettings;
+-import org.hibernate.dialect.DB2Dialect;
+ import org.hibernate.dialect.DatabaseVersion;
+ import org.hibernate.dialect.Dialect;
+ import org.hibernate.dialect.H2Dialect;
+-import org.hibernate.dialect.HANADialect;
+-import org.hibernate.dialect.HSQLDialect;
+-import org.hibernate.dialect.MariaDBDialect;
+-import org.hibernate.dialect.MySQLDialect;
+-import org.hibernate.dialect.OracleDialect;
+-import org.hibernate.dialect.PostgreSQLDialect;
+-import org.hibernate.dialect.PostgresPlusDialect;
+-import org.hibernate.dialect.SQLServerDialect;
+-import org.hibernate.dialect.SpannerDialect;
+-import org.hibernate.dialect.SybaseDialect;
+ import org.hibernate.engine.jdbc.dialect.internal.DialectFactoryImpl;
+ import org.hibernate.engine.jdbc.dialect.spi.DialectFactory;
+ import org.hibernate.engine.jdbc.dialect.spi.DialectResolutionInfo;
+@@ -108,34 +96,47 @@ void testAccessAllowed() {
+ 	}
+ 
+ 	static Stream<Arguments> dialects() {
++		// NUODB: Start
++		Class<? extends Dialect> nuoDbDialectClass = H2Dialect.class;
++
++		try {
++			nuoDbDialectClass = (Class<? extends Dialect>)Class.forName("com.nuodb.hibernate.NuoDBDialect");
++		} catch (ClassNotFoundException e) {
++			java.util.logging.Logger.getLogger(MetadataAccessTests.class.getName()).severe("Unable to load NuoDBDialect class");
++		}
++		// NUODB: End
++
+ 		return Stream.of(
+-				Arguments.of( "DB2", DB2Dialect.class,
+-						getVersionConstant( DB2Dialect.class, "MINIMUM_VERSION") ),
+-				Arguments.of( "EnterpriseDB", PostgresPlusDialect.class,
+-						getVersionConstant( PostgreSQLDialect.class, "MINIMUM_VERSION") ),
+-				Arguments.of( "H2", H2Dialect.class,
+-						getVersionConstant( H2Dialect.class, "MINIMUM_VERSION") ),
+-				Arguments.of( "HSQL Database Engine", HSQLDialect.class,
+-						getVersionConstant( HSQLDialect.class, "MINIMUM_VERSION") ),
+-				Arguments.of( "HDB", HANADialect.class,
+-						getVersionConstant( HANADialect.class, "MINIMUM_VERSION") ),
+-				Arguments.of( "MariaDB", MariaDBDialect.class,
+-						getVersionConstant( MariaDBDialect.class, "MINIMUM_VERSION") ),
+-				Arguments.of( "MySQL", MySQLDialect.class,
+-						getVersionConstant( MySQLDialect.class, "MINIMUM_VERSION") ),
+-				Arguments.of( "Oracle", OracleDialect.class,
+-						getVersionConstant( OracleDialect.class, "MINIMUM_VERSION") ),
+-				Arguments.of( "PostgreSQL", PostgreSQLDialect.class,
+-						getVersionConstant( PostgreSQLDialect.class, "MINIMUM_VERSION") ),
+-				Arguments.of( "Google Cloud Spanner", SpannerDialect.class, ZERO_VERSION ),
+-				Arguments.of( "Microsoft SQL Server", SQLServerDialect.class,
+-						getVersionConstant( SQLServerDialect.class, "MINIMUM_VERSION") ),
+-				Arguments.of( "Sybase SQL Server", SybaseDialect.class,
+-						getVersionConstant( SybaseDialect.class, "MINIMUM_VERSION") ),
+-				Arguments.of( "Adaptive Server Enterprise", SybaseDialect.class,
+-						getVersionConstant( SybaseDialect.class, "MINIMUM_VERSION") ),
+-				Arguments.of( "ASE", SybaseDialect.class,
+-						getVersionConstant( SybaseDialect.class, "MINIMUM_VERSION") )
++				// NUODB: Start - only NuoDB is running, so all the others fail
++				// Arguments.of( "DB2", DB2Dialect.class,
++				// 		getVersionConstant( DB2Dialect.class, "MINIMUM_VERSION") ),
++				// Arguments.of( "EnterpriseDB", PostgresPlusDialect.class,
++				// 		getVersionConstant( PostgreSQLDialect.class, "MINIMUM_VERSION") ),
++				// Arguments.of( "H2", H2Dialect.class,
++				// 		getVersionConstant( H2Dialect.class, "MINIMUM_VERSION") ),
++				// Arguments.of( "HSQL Database Engine", HSQLDialect.class,
++				// 		getVersionConstant( HSQLDialect.class, "MINIMUM_VERSION") ),
++				// Arguments.of( "HDB", HANADialect.class,
++				// 		getVersionConstant( HANADialect.class, "MINIMUM_VERSION") ),
++				// Arguments.of( "MariaDB", MariaDBDialect.class,
++				// 		getVersionConstant( MariaDBDialect.class, "MINIMUM_VERSION") ),
++				// Arguments.of( "MySQL", MySQLDialect.class,
++				// 		getVersionConstant( MySQLDialect.class, "MINIMUM_VERSION") ),
++				// Arguments.of( "Oracle", OracleDialect.class,
++				// 		getVersionConstant( OracleDialect.class, "MINIMUM_VERSION") ),
++				// Arguments.of( "PostgreSQL", PostgreSQLDialect.class,
++				// 		getVersionConstant( PostgreSQLDialect.class, "MINIMUM_VERSION") ),
++				// Arguments.of( "Google Cloud Spanner", SpannerDialect.class, ZERO_VERSION ),
++				// Arguments.of( "Microsoft SQL Server", SQLServerDialect.class,
++				// 		getVersionConstant( SQLServerDialect.class, "MINIMUM_VERSION") ),
++				// Arguments.of( "Sybase SQL Server", SybaseDialect.class,
++				// 		getVersionConstant( SybaseDialect.class, "MINIMUM_VERSION") ),
++				// Arguments.of( "Adaptive Server Enterprise", SybaseDialect.class,
++				// 		getVersionConstant( SybaseDialect.class, "MINIMUM_VERSION") ),
++				// Arguments.of( "ASE", SybaseDialect.class,
++				// 		getVersionConstant( SybaseDialect.class, "MINIMUM_VERSION") )
++				Arguments.of( "NuoDB", nuoDbDialectClass,
++						getVersionConstant( nuoDbDialectClass, "MINIMUM_VERSION") )
+ 		);
+ 	}
+ 
+diff --git a/hibernate-core/src/test/java/org/hibernate/orm/test/bytecode/enhancement/lazy/LazyLoadingAndInheritanceTest.java b/hibernate-core/src/test/java/org/hibernate/orm/test/bytecode/enhancement/lazy/LazyLoadingAndInheritanceTest.java
+index 7906a91485..e0f6d83623 100644
+--- a/hibernate-core/src/test/java/org/hibernate/orm/test/bytecode/enhancement/lazy/LazyLoadingAndInheritanceTest.java
++++ b/hibernate-core/src/test/java/org/hibernate/orm/test/bytecode/enhancement/lazy/LazyLoadingAndInheritanceTest.java
+@@ -26,6 +26,7 @@
+ import jakarta.persistence.GenerationType;
+ import jakarta.persistence.Id;
+ import jakarta.persistence.ManyToOne;
++import jakarta.persistence.Table;
+ 
+ @DomainModel(
+ 		annotatedClasses = {
+@@ -71,6 +72,7 @@ public void test(SessionFactoryScope scope) {
+ 	}
+ 
+ 	@Entity(name = "Containing")
++	@Table(name = "xcontaining") // NuoDB: containing reserved word
+ 	static class Containing {
+ 
+ 		@Id
+diff --git a/hibernate-core/src/test/java/org/hibernate/orm/test/bytecode/enhancement/lazy/LazyOneToOneRemoveFlushAccessTest.java b/hibernate-core/src/test/java/org/hibernate/orm/test/bytecode/enhancement/lazy/LazyOneToOneRemoveFlushAccessTest.java
+index e05296516d..04368d0c72 100644
+--- a/hibernate-core/src/test/java/org/hibernate/orm/test/bytecode/enhancement/lazy/LazyOneToOneRemoveFlushAccessTest.java
++++ b/hibernate-core/src/test/java/org/hibernate/orm/test/bytecode/enhancement/lazy/LazyOneToOneRemoveFlushAccessTest.java
+@@ -158,7 +158,7 @@ static class ContainedEntity {
+ 		private Integer id;
+ 
+ 		@OneToOne( fetch = FetchType.LAZY )
+-		@JoinColumn( name = "containing" )
++		@JoinColumn( name = "xcontaining" ) // NuoDB: containing reserved word
+ 		private ContainingEntity containing;
+ 
+ 		public Integer getId() {
+diff --git a/hibernate-core/src/test/java/org/hibernate/orm/test/dialect/resolver/DialectFactoryTest.java b/hibernate-core/src/test/java/org/hibernate/orm/test/dialect/resolver/DialectFactoryTest.java
+index 28c6b66da8..6ec5e25713 100644
+--- a/hibernate-core/src/test/java/org/hibernate/orm/test/dialect/resolver/DialectFactoryTest.java
++++ b/hibernate-core/src/test/java/org/hibernate/orm/test/dialect/resolver/DialectFactoryTest.java
+@@ -112,6 +112,18 @@ public void testBuildDialectByProperties() {
+ 
+ 	@Test
+ 	public void testPreregisteredDialects() {
++		// NUODB: Start
++		Class<? extends Dialect> nuoDbDialectClass = H2Dialect.class;
++		DialectResolver nuoDbResolver = null;
++
++		try {
++			nuoDbDialectClass = (Class<? extends Dialect>)Class.forName("com.nuodb.hibernate.NuoDBDialect");
++			nuoDbResolver =  (DialectResolver)Class.forName("com.nuodb.hibernate.NuoDBDialectResolver").newInstance();
++		} catch (Exception e) {
++			java.util.logging.Logger.getLogger(DialectFactoryTest.class.getName()).severe("Unable to load NuoDBDialect class");
++		}
++		// NUODB: End
++
+ 		DialectResolver resolver = new StandardDialectResolver();
+ 		testDetermination( "HSQL Database Engine", HSQLDialect.class, resolver );
+ 		testDetermination( "H2", H2Dialect.class, resolver );
+@@ -156,6 +168,15 @@ public void testPreregisteredDialects() {
+ 		testDetermination( "Oracle", 9, OracleDialect.class, resolver );
+ 		testDetermination( "Oracle", 10, OracleDialect.class, resolver );
+ 		testDetermination( "Oracle", 11, OracleDialect.class, resolver );
++		// NUODB: Start
++		resolver = nuoDbResolver;
++
++		if (resolver != null ) {
++			testDetermination( "NuoDB", 5, nuoDbDialectClass, resolver );
++			testDetermination( "NuoDB", 6, nuoDbDialectClass, resolver );
++			testDetermination( "NuoDB", 7, nuoDbDialectClass, resolver );
++		}
++		// NUODB: End
+ 	}
+ 
+ 	@Test
+diff --git a/hibernate-core/src/test/java/org/hibernate/orm/test/embeddable/MappedByEmbeddableTest.java b/hibernate-core/src/test/java/org/hibernate/orm/test/embeddable/MappedByEmbeddableTest.java
+index a90ea30e73..cf7835de3a 100644
+--- a/hibernate-core/src/test/java/org/hibernate/orm/test/embeddable/MappedByEmbeddableTest.java
++++ b/hibernate-core/src/test/java/org/hibernate/orm/test/embeddable/MappedByEmbeddableTest.java
+@@ -8,8 +8,10 @@
+ import jakarta.persistence.Embeddable;
+ import jakarta.persistence.Embedded;
+ import jakarta.persistence.Entity;
++import jakarta.persistence.Table;
+ import jakarta.persistence.Id;
+ import jakarta.persistence.OneToOne;
++import jakarta.persistence.PrimaryKeyJoinColumn;
+ import org.hibernate.Session;
+ import org.hibernate.query.Query;
+ import org.hibernate.testing.orm.junit.DomainModel;
+@@ -123,6 +125,7 @@ private void loadContaining(Session session, Integer containingId, Integer conta
+ 	}
+ 
+ 	@Entity(name = "containing")
++	@Table(name = "xcontaining") // NuoDB: 'containing' reserved word
+ 	public static class Containing {
+ 
+ 		@Id
+@@ -173,6 +176,7 @@ public static class Contained {
+ 		private String data;
+ 
+ 		@OneToOne(mappedBy = "embed.contained")
++		@PrimaryKeyJoinColumn(name="xcontaining") // NuoDB: 'containing' reserved word
+ 		private Containing containing;
+ 
+ 		public Integer getId() {
+diff --git a/hibernate-core/src/test/java/org/hibernate/orm/test/embeddable/OrderByEmbeddableToOneTest.java b/hibernate-core/src/test/java/org/hibernate/orm/test/embeddable/OrderByEmbeddableToOneTest.java
+index 5e05c71513..65fa59c8e4 100644
+--- a/hibernate-core/src/test/java/org/hibernate/orm/test/embeddable/OrderByEmbeddableToOneTest.java
++++ b/hibernate-core/src/test/java/org/hibernate/orm/test/embeddable/OrderByEmbeddableToOneTest.java
+@@ -46,7 +46,8 @@ public void test(SessionFactoryScope factoryScope) {
+ 		} );
+ 
+ 		factoryScope.inTransaction( session -> {
+-			Query<Containing> query = session.createQuery( "select c from containing c order by c.id asc", Containing.class );
++			// NuoDB: 'containing' is reserved word
++			Query<Containing> query = session.createQuery( "select c from xcontaining c order by c.id asc", Containing.class );
+ 
+ 			List<Containing> resultList = query.getResultList();
+ 			assertThat( resultList ).hasSize( 3 );
+@@ -92,7 +93,7 @@ private void saveComposition(Session session, int id) {
+ 		session.persist( contained3 );
+ 	}
+ 
+-	@Entity(name = "containing")
++	@Entity(name = "xcontaining") // NuoDB: 'containing' is reserved word
+ 	public static class Containing {
+ 
+ 		@Id
+diff --git a/hibernate-core/src/test/java/org/hibernate/orm/test/embeddable/OrderByEmbeddableX2Test.java b/hibernate-core/src/test/java/org/hibernate/orm/test/embeddable/OrderByEmbeddableX2Test.java
+index 6e1907fc8b..cb15e4d912 100644
+--- a/hibernate-core/src/test/java/org/hibernate/orm/test/embeddable/OrderByEmbeddableX2Test.java
++++ b/hibernate-core/src/test/java/org/hibernate/orm/test/embeddable/OrderByEmbeddableX2Test.java
+@@ -46,7 +46,8 @@ public void test(SessionFactoryScope factoryScope) {
+ 		} );
+ 
+ 		factoryScope.inTransaction( session -> {
+-			Query<Containing> query = session.createQuery( "select c from containing c order by c.id asc", Containing.class );
++			// NuoDB: 'containing' is reserved word
++			Query<Containing> query = session.createQuery( "select c from xcontaining c order by c.id asc", Containing.class );
+ 
+ 			List<Containing> resultList = query.getResultList();
+ 			assertThat( resultList ).hasSize( 3 );
+@@ -86,7 +87,7 @@ private void saveComposition(Session session, int id) {
+ 		session.persist( containing );
+ 	}
+ 
+-	@Entity(name = "containing")
++	@Entity(name = "xcontaining") // NuoDB: 'containing' is reserved word
+ 	public static class Containing {
+ 
+ 		@Id
+diff --git a/hibernate-core/src/test/java/org/hibernate/orm/test/exceptionhandling/StaleObjectMergeTest.java b/hibernate-core/src/test/java/org/hibernate/orm/test/exceptionhandling/StaleObjectMergeTest.java
+index 6c7cf9f232..7c519fffd2 100644
+--- a/hibernate-core/src/test/java/org/hibernate/orm/test/exceptionhandling/StaleObjectMergeTest.java
++++ b/hibernate-core/src/test/java/org/hibernate/orm/test/exceptionhandling/StaleObjectMergeTest.java
+@@ -165,7 +165,7 @@ public static class B {
+ 		private long id;
+ 
+ 		@Version
+-		@Column(name = "ver")
++		@Column(name = "xver") // NuoDB: 'ver' is reserved word
+ 		private int version;
+ 
+ 		public Long getId() {
+@@ -192,7 +192,7 @@ public static class C {
+ 		private long id;
+ 
+ 		@Version
+-		@Column(name = "ver")
++		@Column(name = "xver") // NuoDB: 'ver' is reserved word
+ 		private Integer version;
+ 
+ 		public Long getId() {
+@@ -211,7 +211,7 @@ public static class D {
+ 		private long id;
+ 
+ 		@Version
+-		@Column(name = "ver")
++		@Column(name = "xver") // NuoDB: 'ver' is reserved word
+ 		private Timestamp version;
+ 
+ 		public Long getId() {
+diff --git a/hibernate-core/src/test/java/org/hibernate/orm/test/exceptionhandling/StaleObjectStateExceptionHandlingTest.java b/hibernate-core/src/test/java/org/hibernate/orm/test/exceptionhandling/StaleObjectStateExceptionHandlingTest.java
+index 0aea63acec..d244c958b1 100644
+--- a/hibernate-core/src/test/java/org/hibernate/orm/test/exceptionhandling/StaleObjectStateExceptionHandlingTest.java
++++ b/hibernate-core/src/test/java/org/hibernate/orm/test/exceptionhandling/StaleObjectStateExceptionHandlingTest.java
+@@ -105,7 +105,7 @@ public static class A {
+ 		private String name;
+ 
+ 		@Version
+-		@Column(name = "ver")
++		@Column(name = "xver") // NuoDB: 'ver' is reserved word
+ 		private int version;
+ 	}
+ }
+diff --git a/hibernate-core/src/test/java/org/hibernate/orm/test/exceptionhandling/StaleVersionedObjectMergeTest.java b/hibernate-core/src/test/java/org/hibernate/orm/test/exceptionhandling/StaleVersionedObjectMergeTest.java
+index ec667a4a6a..0b47701ec5 100644
+--- a/hibernate-core/src/test/java/org/hibernate/orm/test/exceptionhandling/StaleVersionedObjectMergeTest.java
++++ b/hibernate-core/src/test/java/org/hibernate/orm/test/exceptionhandling/StaleVersionedObjectMergeTest.java
+@@ -132,7 +132,7 @@ public static class B {
+ 		private long id;
+ 
+ 		@Version
+-		@Column(name = "ver")
++		@Column(name = "xver") // NuoDB: 'ver' is reserved word
+ 		private int version;
+ 
+ 		public Long getId() {
+@@ -158,7 +158,7 @@ public static class C {
+ 		private long id;
+ 
+ 		@Version
+-		@Column(name = "ver")
++		@Column(name = "xver") // NuoDB: 'ver' is reserved word
+ 		private Integer version;
+ 
+ 		public Long getId() {
+@@ -176,7 +176,7 @@ public static class D {
+ 		private long id;
+ 
+ 		@Version
+-		@Column(name = "ver")
++		@Column(name = "xver") // NuoDB: 'ver' is reserved word
+ 		private Timestamp version;
+ 
+ 		public Long getId() {
+diff --git a/hibernate-core/src/test/java/org/hibernate/orm/test/fetch/OneToOneOwnerByContainedEagerCyclesTest.java b/hibernate-core/src/test/java/org/hibernate/orm/test/fetch/OneToOneOwnerByContainedEagerCyclesTest.java
+index ffdb2f9d3a..eb70956650 100644
+--- a/hibernate-core/src/test/java/org/hibernate/orm/test/fetch/OneToOneOwnerByContainedEagerCyclesTest.java
++++ b/hibernate-core/src/test/java/org/hibernate/orm/test/fetch/OneToOneOwnerByContainedEagerCyclesTest.java
+@@ -88,7 +88,7 @@ public void test(SessionFactoryScope factoryScope) {
+ 		} );
+ 	}
+ 
+-	@Entity(name = "Containing")
++	@Entity(name = "xContaining") // NuoDB: 'containing' is reserved word
+ 	public static class Containing {
+ 
+ 		@Id
+diff --git a/hibernate-core/src/test/java/org/hibernate/orm/test/jpa/criteria/basic/ExpressionsTest.java b/hibernate-core/src/test/java/org/hibernate/orm/test/jpa/criteria/basic/ExpressionsTest.java
+index 74fe09fbef..7ef099a616 100644
+--- a/hibernate-core/src/test/java/org/hibernate/orm/test/jpa/criteria/basic/ExpressionsTest.java
++++ b/hibernate-core/src/test/java/org/hibernate/orm/test/jpa/criteria/basic/ExpressionsTest.java
+@@ -30,6 +30,7 @@
+ import org.hibernate.query.criteria.JpaCriteriaQuery;
+ import org.hibernate.query.criteria.JpaDerivedRoot;
+ import org.hibernate.query.criteria.JpaSubQuery;
++import org.hibernate.testing.orm.junit.DialectContext; // For NuoDB
+ import org.hibernate.testing.orm.junit.EntityManagerFactoryScope;
+ import org.hibernate.testing.orm.junit.Jira;
+ import org.hibernate.testing.orm.junit.JiraKey;
+@@ -349,7 +350,11 @@ void testDurationBetween(EntityManagerFactoryScope scope) {
+ 					entityManager.createQuery(criteria).getSingleResult();
+ 				}
+ 		);
+-		scope.inTransaction( entityManager -> {
++		// NUODB: START - skip this test
++		// Duration uses seconds to do calculation but can't do TIME intervals between DATEs
++		// in NuoDB, only between TIMESTAMPs
++		if (!DialectContext.getDialect().getClass().getName().startsWith("com.nuodb")) {
++			scope.inTransaction( entityManager -> {
+ 					CriteriaQuery<Duration> criteria = builder.createQuery(Duration.class);
+ 					criteria.select( builder.durationBetween( builder.localDate(),
+ 							builder.subtractDuration( builder.localDate(),
+@@ -357,6 +362,8 @@ void testDurationBetween(EntityManagerFactoryScope scope) {
+ 					assertEquals( Duration.ofDays(2), entityManager.createQuery(criteria).getSingleResult() );
+ 				}
+ 		);
++		}
++		// NUODB: END
+ 		scope.inTransaction( entityManager -> {
+ 					CriteriaQuery<Duration> criteria = builder.createQuery(Duration.class);
+ 					criteria.select( builder.durationBetween( builder.localDateTime(),
+diff --git a/hibernate-core/src/test/java/org/hibernate/orm/test/jpa/metadata/TypesafeNamedQueryTest.java b/hibernate-core/src/test/java/org/hibernate/orm/test/jpa/metadata/TypesafeNamedQueryTest.java
+index c178d36cb5..3188cc6afd 100644
+--- a/hibernate-core/src/test/java/org/hibernate/orm/test/jpa/metadata/TypesafeNamedQueryTest.java
++++ b/hibernate-core/src/test/java/org/hibernate/orm/test/jpa/metadata/TypesafeNamedQueryTest.java
+@@ -17,6 +17,13 @@
+ public class TypesafeNamedQueryTest {
+ 	@Test void test(EntityManagerFactoryScope scope) {
+ 		scope.inTransaction( entityManager -> {
++
++			// NUODB: Start
++			// Add a short delay so the time stamps are actually different. Otherwise sorting by
++			// time stamp (Record.AllRecordsAsTuples query) is arbitrary.
++			try { Thread.sleep(1); } catch (InterruptedException e) {}
++			// NUODB: End
++
+ 			Record record1 = new Record("Hello, World!", LocalDate.EPOCH.atStartOfDay());
+ 			Record record2 = new Record("Goodbye!", LocalDate.EPOCH.atStartOfDay().plusSeconds( 1L ));
+ 			entityManager.persist(record1);
+diff --git a/hibernate-core/src/test/java/org/hibernate/orm/test/loading/LoadContainedInDoubleContainingTest.java b/hibernate-core/src/test/java/org/hibernate/orm/test/loading/LoadContainedInDoubleContainingTest.java
+index e72f715d25..8c8d90ff4e 100644
+--- a/hibernate-core/src/test/java/org/hibernate/orm/test/loading/LoadContainedInDoubleContainingTest.java
++++ b/hibernate-core/src/test/java/org/hibernate/orm/test/loading/LoadContainedInDoubleContainingTest.java
+@@ -13,6 +13,7 @@
+ import jakarta.persistence.Entity;
+ import jakarta.persistence.Id;
+ import jakarta.persistence.OneToOne;
++import jakarta.persistence.PrimaryKeyJoinColumn;
+ 
+ import static org.assertj.core.api.Assertions.assertThat;
+ 
+@@ -47,7 +48,7 @@ public void test(SessionFactoryScope scope) {
+ 		} );
+ 	}
+ 
+-	@Entity(name = "Containing")
++	@Entity(name = "xContaining") // NuoDB: 'containing' is reserved word
+ 	public static class Containing {
+ 
+ 		@Id
+@@ -112,6 +113,7 @@ public static class Contained {
+ 		private String text;
+ 
+ 		@OneToOne
++		@PrimaryKeyJoinColumn(name="xcontaining") // NuoDB: 'containing' is reserved word
+ 		private Containing containing;
+ 
+ 		public Contained() {
+diff --git a/hibernate-core/src/test/java/org/hibernate/orm/test/loading/LoadParentChildEntityTest.java b/hibernate-core/src/test/java/org/hibernate/orm/test/loading/LoadParentChildEntityTest.java
+index a0a2d06160..4693f369fb 100644
+--- a/hibernate-core/src/test/java/org/hibernate/orm/test/loading/LoadParentChildEntityTest.java
++++ b/hibernate-core/src/test/java/org/hibernate/orm/test/loading/LoadParentChildEntityTest.java
+@@ -62,7 +62,7 @@ public void testLoad(SessionFactoryScope scope) {
+ 	}
+ 
+ 
+-	@Entity(name = "containing")
++	@Entity(name = "xcontaining") // NuoDB: 'containing' is reserved word
+ 	public static class ContainingEntity {
+ 
+ 		@Id
+diff --git a/hibernate-core/src/test/java/org/hibernate/orm/test/locking/JoinedInheritanceOptimisticForceIncrementTest.java b/hibernate-core/src/test/java/org/hibernate/orm/test/locking/JoinedInheritanceOptimisticForceIncrementTest.java
+index 5f30520df0..2fe5b01b08 100644
+--- a/hibernate-core/src/test/java/org/hibernate/orm/test/locking/JoinedInheritanceOptimisticForceIncrementTest.java
++++ b/hibernate-core/src/test/java/org/hibernate/orm/test/locking/JoinedInheritanceOptimisticForceIncrementTest.java
+@@ -69,7 +69,7 @@ public static class Person {
+ 		private Long id;
+ 
+ 		@Version
+-		@Column(name = "ver")
++		@Column(name = "xver") // NuoDB: 'ver' is reserved word
+ 		private Integer version;
+ 
+ 		private String name;
+diff --git a/hibernate-core/src/test/java/org/hibernate/orm/test/locking/LockRefreshTest.java b/hibernate-core/src/test/java/org/hibernate/orm/test/locking/LockRefreshTest.java
+index 09db1a5d72..8d38116103 100644
+--- a/hibernate-core/src/test/java/org/hibernate/orm/test/locking/LockRefreshTest.java
++++ b/hibernate-core/src/test/java/org/hibernate/orm/test/locking/LockRefreshTest.java
+@@ -132,7 +132,7 @@ public static class Employee {
+ 		private String department;
+ 
+ 		@Version
+-		@Column(name = "ver")
++		@Column(name = "xver") // NuoDB: 'ver' is reserved word
+ 		private int version;
+ 	}
+ }
+diff --git a/hibernate-core/src/test/java/org/hibernate/orm/test/mapping/MappedSuperclassWithGenericsTest.java b/hibernate-core/src/test/java/org/hibernate/orm/test/mapping/MappedSuperclassWithGenericsTest.java
+index cbff1dedeb..0840be73c5 100644
+--- a/hibernate-core/src/test/java/org/hibernate/orm/test/mapping/MappedSuperclassWithGenericsTest.java
++++ b/hibernate-core/src/test/java/org/hibernate/orm/test/mapping/MappedSuperclassWithGenericsTest.java
+@@ -144,7 +144,7 @@ public T getId() {
+ 
+ 	@Entity( name = "SimpleEntity" )
+ 	public static class SimpleEntity extends GenericIdBaseEntity<Long> {
+-		@Column
++		@Column(name = "xstring") // NuoDB: 'string' is reserved word
+ 		private String string;
+ 
+ 		public SimpleEntity() {
+diff --git a/hibernate-core/src/test/java/org/hibernate/orm/test/mapping/basic/StringMappingTests.java b/hibernate-core/src/test/java/org/hibernate/orm/test/mapping/basic/StringMappingTests.java
+index b511d96ae6..678bb6812a 100644
+--- a/hibernate-core/src/test/java/org/hibernate/orm/test/mapping/basic/StringMappingTests.java
++++ b/hibernate-core/src/test/java/org/hibernate/orm/test/mapping/basic/StringMappingTests.java
+@@ -5,6 +5,7 @@
+ package org.hibernate.orm.test.mapping.basic;
+ 
+ import java.sql.Types;
++import jakarta.persistence.Column;
+ import jakarta.persistence.Entity;
+ import jakarta.persistence.Id;
+ import jakarta.persistence.Lob;
+@@ -82,6 +83,7 @@ public static class EntityOfStrings {
+ 
+ 		//tag::basic-string-example[]
+ 		// will be mapped using VARCHAR
++		@Column(name="xstring") // NuoDB: 'string' is reserved word
+ 		String string;
+ 
+ 		// will be mapped using CLOB
+diff --git a/hibernate-core/src/test/java/org/hibernate/orm/test/query/QueryTimeOutTest.java b/hibernate-core/src/test/java/org/hibernate/orm/test/query/QueryTimeOutTest.java
+index 0d364dc7c3..dccd1f01c6 100644
+--- a/hibernate-core/src/test/java/org/hibernate/orm/test/query/QueryTimeOutTest.java
++++ b/hibernate-core/src/test/java/org/hibernate/orm/test/query/QueryTimeOutTest.java
+@@ -69,7 +69,10 @@ public void before() {
+ 						Types.VARCHAR
+ 				);
+ 		final String baseQuery;
+-		if ( DialectContext.getDialect() instanceof OracleDialect ) {
++		// NUODB: Add our dialect
++		if ( DialectContext.getDialect() instanceof OracleDialect
++			|| DialectContext.getDialect().getClass().getName().contains("nuodb")) {
++		// NUODB: End
+ 			baseQuery = "update AnEntity ae1_0 set ae1_0.name=?";
+ 		}
+ 		else if ( DialectContext.getDialect() instanceof SybaseDialect ) {
+diff --git a/hibernate-core/src/test/java/org/hibernate/orm/test/query/SelectWithWrongResultTypeTest.java b/hibernate-core/src/test/java/org/hibernate/orm/test/query/SelectWithWrongResultTypeTest.java
+index 24221cc484..e79c15a88a 100644
+--- a/hibernate-core/src/test/java/org/hibernate/orm/test/query/SelectWithWrongResultTypeTest.java
++++ b/hibernate-core/src/test/java/org/hibernate/orm/test/query/SelectWithWrongResultTypeTest.java
+@@ -5,6 +5,7 @@
+ package org.hibernate.orm.test.query;
+ 
+ import jakarta.persistence.CascadeType;
++import jakarta.persistence.Column;
+ import jakarta.persistence.Entity;
+ import jakarta.persistence.FetchType;
+ import jakarta.persistence.GeneratedValue;
+@@ -146,6 +147,7 @@ public static class Node {
+ 		@Version
+ 		Integer version;
+ 
++		@Column(name="xstring") // NUODB: String is a reserved word
+ 		String string;
+ 
+ 		@ManyToOne(fetch = FetchType.LAZY,
+diff --git a/hibernate-core/src/test/java/org/hibernate/orm/test/query/SubselectFetch2Test.java b/hibernate-core/src/test/java/org/hibernate/orm/test/query/SubselectFetch2Test.java
+index 204378c077..f819df33fc 100644
+--- a/hibernate-core/src/test/java/org/hibernate/orm/test/query/SubselectFetch2Test.java
++++ b/hibernate-core/src/test/java/org/hibernate/orm/test/query/SubselectFetch2Test.java
+@@ -4,6 +4,7 @@
+  */
+ package org.hibernate.orm.test.query;
+ 
++import jakarta.persistence.Column;
+ import jakarta.persistence.ElementCollection;
+ import jakarta.persistence.Entity;
+ import jakarta.persistence.GeneratedValue;
+@@ -15,6 +16,8 @@
+ import jakarta.persistence.Version;
+ import org.hibernate.annotations.Fetch;
+ import org.hibernate.annotations.FetchMode;
++import org.hibernate.orm.test.query.SubselectFetch2Test.NodeHolder;
++import org.hibernate.orm.test.query.SubselectFetch2Test.NodeIntermediateHolder;
+ import org.hibernate.testing.orm.junit.DomainModel;
+ import org.hibernate.testing.orm.junit.JiraKey;
+ import org.hibernate.testing.orm.junit.SessionFactory;
+@@ -164,6 +167,7 @@ public static class Node {
+ 		Integer id;
+ 		@Version
+ 		Integer version;
++		@Column(name="xstring") // NUODB: String is a reserved word
+ 		String string;
+ 		@Transient
+ 		boolean loaded = false;
+diff --git a/hibernate-core/src/test/java/org/hibernate/orm/test/query/SubselectFetchTest.java b/hibernate-core/src/test/java/org/hibernate/orm/test/query/SubselectFetchTest.java
+index 37eff2356e..3c64bd53b6 100644
+--- a/hibernate-core/src/test/java/org/hibernate/orm/test/query/SubselectFetchTest.java
++++ b/hibernate-core/src/test/java/org/hibernate/orm/test/query/SubselectFetchTest.java
+@@ -4,6 +4,7 @@
+  */
+ package org.hibernate.orm.test.query;
+ 
++import jakarta.persistence.Column;
+ import jakarta.persistence.Entity;
+ import jakarta.persistence.GeneratedValue;
+ import jakarta.persistence.Id;
+@@ -112,6 +113,7 @@ public static class Node {
+ 		Integer id;
+ 		@Version
+ 		Integer version;
++		@Column(name="xstring") // NUODB: String is a reserved word
+ 		String string;
+ 		@Transient
+ 		boolean loaded = false;
+diff --git a/hibernate-core/src/test/java/org/hibernate/orm/test/query/hql/FunctionTests.java b/hibernate-core/src/test/java/org/hibernate/orm/test/query/hql/FunctionTests.java
+index 9b1ee6a76e..b00edc80bc 100644
+--- a/hibernate-core/src/test/java/org/hibernate/orm/test/query/hql/FunctionTests.java
++++ b/hibernate-core/src/test/java/org/hibernate/orm/test/query/hql/FunctionTests.java
+@@ -37,6 +37,7 @@
+ import org.hibernate.testing.orm.domain.gambit.EntityOfLists;
+ import org.hibernate.testing.orm.domain.gambit.EntityOfMaps;
+ import org.hibernate.testing.orm.domain.gambit.SimpleEntity;
++import org.hibernate.testing.orm.junit.DialectContext;  // For NuoDB
+ import org.hibernate.testing.orm.junit.DialectFeatureChecks;
+ import org.hibernate.testing.orm.junit.DomainModel;
+ import org.hibernate.testing.orm.junit.Jira;
+@@ -532,7 +533,9 @@ public void testMathFunctions(SessionFactoryScope scope) {
+ 							.list();
+ 					session.createQuery("select abs(e.theDouble), sign(e.theDouble), sqrt(e.theDouble) from EntityOfBasics e", Object[].class)
+ 							.list();
+-					session.createQuery("select exp(e.theDouble), ln(e.theDouble + 1), log10(e.theDouble + 2) from EntityOfBasics e", Object[].class)
++					// NUODB: No support for ln() or log10()
++					//session.createQuery("select exp(e.theDouble), ln(e.theDouble + 1), log10(e.theDouble + 2) from EntityOfBasics e", Object[].class)
++					session.createQuery("select exp(e.theDouble) from EntityOfBasics e", Object[].class)
+ 							.list();
+ 					session.createQuery("select power(e.theDouble + 1, 2.5) from EntityOfBasics e", Double.class)
+ 							.list();
+@@ -2189,9 +2192,12 @@ public void testExtractFunctionDayOfWeekOf(SessionFactoryScope scope) {
+ 
+ 					session.createQuery("select extract(week of month from current date) from EntityOfBasics e", Integer.class)
+ 							.list();
++					// NUODB: START  No support for extract(WEEK)
++					if (!DialectContext.getDialect().getClass().getName().contains("nuodb")) {
+ 					session.createQuery("select extract(week of year from current date) from EntityOfBasics e", Integer.class)
+ 							.list();
+-
++					}
++					// NUODB: END
+ 				}
+ 		);
+ 	}
+@@ -2298,6 +2304,8 @@ public void testExtractWeekWithAssertions(SessionFactoryScope scope) {
+ 							is(2)
+ 					);
+ 
++					// NUODB: START  No support for extract(WEEK)
++					if (!DialectContext.getDialect().getClass().getName().contains("nuodb")) {
+ 					assertThat(
+ 							session.createQuery("select extract(week from date 2019-05-27) from EntityOfBasics", Integer.class).getResultList().get(0),
+ 							is(22)
+@@ -2310,6 +2318,8 @@ public void testExtractWeekWithAssertions(SessionFactoryScope scope) {
+ 							session.createQuery("select extract(week from date 2019-06-03) from EntityOfBasics", Integer.class).getResultList().get(0),
+ 							is(23)
+ 					);
++					}
++					// NUODB: END
+ 
+ 					assertThat(
+ 							session.createQuery("select extract(day of year from date 2019-05-30) from EntityOfBasics", Integer.class).getResultList().get(0),
+diff --git a/hibernate-core/src/test/java/org/hibernate/orm/test/query/hql/StandardFunctionTests.java b/hibernate-core/src/test/java/org/hibernate/orm/test/query/hql/StandardFunctionTests.java
+index daa04e995c..e5a95fcb14 100644
+--- a/hibernate-core/src/test/java/org/hibernate/orm/test/query/hql/StandardFunctionTests.java
++++ b/hibernate-core/src/test/java/org/hibernate/orm/test/query/hql/StandardFunctionTests.java
+@@ -19,6 +19,7 @@
+ import org.hamcrest.number.IsCloseTo;
+ import org.hibernate.testing.orm.domain.StandardDomainModel;
+ import org.hibernate.testing.orm.domain.gambit.EntityOfBasics;
++import org.hibernate.testing.orm.junit.DialectContext; // For NuoDB
+ import org.hibernate.testing.orm.junit.DialectFeatureChecks;
+ import org.hibernate.testing.orm.junit.DomainModel;
+ import org.hibernate.testing.orm.junit.RequiresDialectFeature;
+@@ -230,7 +231,9 @@ public void testMathFunctions(SessionFactoryScope scope) {
+ 							.list();
+ 					session.createQuery("select abs(e.theDouble), sign(e.theDouble), sqrt(e.theDouble) from EntityOfBasics e")
+ 							.list();
+-					session.createQuery("select exp(e.theDouble), ln(e.theDouble + 1) from EntityOfBasics e")
++					// NuoDB ln() not supported
++					//session.createQuery("select exp(e.theDouble), ln(e.theDouble + 1) from EntityOfBasics e")
++					session.createQuery("select exp(e.theDouble) from EntityOfBasics e")
+ 							.list();
+ 					session.createQuery("select power(e.theDouble + 1, 2.5) from EntityOfBasics e")
+ 							.list();
+@@ -610,8 +613,12 @@ public void testExtractFunction(SessionFactoryScope scope) {
+ 					session.createQuery("select extract(day of week from e.theDate) from EntityOfBasics e")
+ 							.list();
+ 
++					// NUODB: START  No support for extract(WEEK)
++					if (!DialectContext.getDialect().getClass().getName().contains("nuodb"))
+ 					session.createQuery("select extract(week from e.theDate) from EntityOfBasics e")
+ 							.list();
++					// NUODB: END
++
+ 					session.createQuery("select extract(quarter from e.theDate) from EntityOfBasics e")
+ 							.list();
+ 
+@@ -698,6 +705,8 @@ public void isolated(SessionFactoryScope scope) {
+ 	public void testExtractFunctionWithAssertions(SessionFactoryScope scope) {
+ 		scope.inTransaction(
+ 				session -> {
++					// NUODB: START  No support for extract(WEEK)
++					if (!DialectContext.getDialect().getClass().getName().contains("nuodb")) {
+ 					assertThat(
+ 							session.createQuery(
+ 									"select extract(week of year from {2019-01-01}) from EntityOfBasics b where b.id = 123" )
+@@ -735,19 +744,22 @@ public void testExtractFunctionWithAssertions(SessionFactoryScope scope) {
+ 							is( 1 )
+ 					);
+ 
++					// NUODB: Moved this from just below
+ 					assertThat(
+-							session.createQuery(
+-									"select extract(week of month from {2019-05-01}) from EntityOfBasics" )
++							session.createQuery( "select extract(week from {2019-05-27}) from EntityOfBasics" )
+ 									.getResultList()
+ 									.get( 0 ),
+-							is( 1 )
++							is( 22 )
+ 					);
++					}
++					// NUODB: END
+ 
+ 					assertThat(
+-							session.createQuery( "select extract(week from {2019-05-27}) from EntityOfBasics" )
++							session.createQuery(
++									"select extract(week of month from {2019-05-01}) from EntityOfBasics" )
+ 									.getResultList()
+ 									.get( 0 ),
+-							is( 22 )
++							is( 1 )
+ 					);
+ 
+ 					assertThat(
+diff --git a/hibernate-core/src/test/java/org/hibernate/orm/test/sql/TemplateTest.java b/hibernate-core/src/test/java/org/hibernate/orm/test/sql/TemplateTest.java
+index dad99a32a9..40d02bcd96 100644
+--- a/hibernate-core/src/test/java/org/hibernate/orm/test/sql/TemplateTest.java
++++ b/hibernate-core/src/test/java/org/hibernate/orm/test/sql/TemplateTest.java
+@@ -98,7 +98,10 @@ public void testFetchGrammarVsColumnNames(SessionFactoryScope scope) {
+ 				"where {@}.fetch_count > 5 and fetch next 1 row only", factory );
+ 		assertWhereStringTemplate( "select first from users fetch first 10 rows only",
+ 				"select {@}.first from users fetch first 10 rows only", factory );
+-		assertWhereStringTemplate( "select next from users fetch next 10 rows only",
++
++		// NUODB: NEXT is a keyword. Don't understand this test.
++		if (!factory.getJdbcServices().getDialect().getClass().getName().contains("nuodb"))
++			assertWhereStringTemplate( "select next from users fetch next 10 rows only",
+ 				"select {@}.next from users fetch next 10 rows only", factory );
+ 	}
+ 
+@@ -122,9 +125,11 @@ public void testFetchGrammarVariants(SessionFactoryScope scope) {
+ 		assertWhereStringTemplate( "fetch    first   10   rows   only", "fetch    first   10   rows   only", factory );
+ 		assertWhereStringTemplate( "fetch\nfirst 3 rows only", "fetch\nfirst 3 rows only", factory );
+ 
+-		// State reset after ONLY: trailing 'next' should be qualified
+-		assertWhereStringTemplate( "fetch next 1 rows only and next > 5",
+-				"fetch next 1 rows only and {@}.next > 5", factory );
++		// NUODB: NEXT is a keyword. Don't understand this test.
++		if (!dialect.getClass().getName().contains("nuodb"))
++			// State reset after ONLY: trailing 'next' should be qualified
++			assertWhereStringTemplate( "fetch next 1 rows only and next > 5",
++					"fetch next 1 rows only and {@}.next > 5", factory );
+ 
+ 		// Qualified identifier should remain as-is
+ 		assertWhereStringTemplate( "select u.first from users u fetch first 1 row only",
+diff --git a/hibernate-core/src/test/java/org/hibernate/orm/test/stateless/StatelessSessionStatisticsTest.java b/hibernate-core/src/test/java/org/hibernate/orm/test/stateless/StatelessSessionStatisticsTest.java
+index 7109f7457c..f6f7c8fcc7 100644
+--- a/hibernate-core/src/test/java/org/hibernate/orm/test/stateless/StatelessSessionStatisticsTest.java
++++ b/hibernate-core/src/test/java/org/hibernate/orm/test/stateless/StatelessSessionStatisticsTest.java
+@@ -37,7 +37,11 @@ void test(SessionFactoryScope scope) {
+ 		final StatisticsImplementor statistics = scope.getSessionFactory().getStatistics();
+ 		final Dialect dialect = scope.fromSession( session -> session.getDialect() );
+ 		final boolean isSybaseOrMysql = dialect.getClass().getName().toLowerCase( Locale.ROOT ).split( "sybase|mysql" ).length == 2;
+-		int stmtCount = isSybaseOrMysql ? 4 : 3;
++
++		// NUODB: START - like Sybase and MySQL, NuoDB uses 4 prepared statements
++		final boolean isNuoDb = dialect.getClass().getName().contains("com.nuodb");
++		int stmtCount = isSybaseOrMysql || isNuoDb ? 4 : 3;  //
++		// NUODB: END
+ 
+ 		assertEquals(0, statistics.getEntityInsertCount());
+ 		assertEquals(0, statistics.getEntityUpdateCount());
+diff --git a/hibernate-core/src/test/java/org/hibernate/orm/test/version/sybase/SybaseTimestampComparisonAnnotationsTest.java b/hibernate-core/src/test/java/org/hibernate/orm/test/version/sybase/SybaseTimestampComparisonAnnotationsTest.java
+index 1eab183218..ebe7df34ec 100644
+--- a/hibernate-core/src/test/java/org/hibernate/orm/test/version/sybase/SybaseTimestampComparisonAnnotationsTest.java
++++ b/hibernate-core/src/test/java/org/hibernate/orm/test/version/sybase/SybaseTimestampComparisonAnnotationsTest.java
+@@ -80,7 +80,7 @@ public static class Thing {
+ 
+ 		@Version
+ 		@Generated(event = { EventType.INSERT,EventType.UPDATE})
+-		@Column(name = "ver", columnDefinition = "timestamp")
++		@Column(name = "xver", columnDefinition = "timestamp") // NuoDB: 'ver' is reserved word
+ 		private byte[] version;
+ 
+ 		private String name;
+diff --git a/hibernate-core/src/test/resources/org/hibernate/orm/test/typeparameters/Widget.hbm.xml b/hibernate-core/src/test/resources/org/hibernate/orm/test/typeparameters/Widget.hbm.xml
+index f4e3257d84..f68a36de73 100644
+--- a/hibernate-core/src/test/resources/org/hibernate/orm/test/typeparameters/Widget.hbm.xml
++++ b/hibernate-core/src/test/resources/org/hibernate/orm/test/typeparameters/Widget.hbm.xml
+@@ -28,7 +28,7 @@
+ 				<param name="default">-5</param>
+ 			</type>
+ 		</property>
+-		<property name="string"/>
++		<property name="string" column="xstring"/> // NuoDB: 'string' is reserved word`
+     </class>
+     
+ 
+diff --git a/hibernate-testing/hibernate-testing.gradle b/hibernate-testing/hibernate-testing.gradle
+index d5a62793e3..5ce7e35bf7 100644
+--- a/hibernate-testing/hibernate-testing.gradle
++++ b/hibernate-testing/hibernate-testing.gradle
+@@ -10,6 +10,13 @@ plugins {
+ 
+ description = 'Support for testing Hibernate ORM functionality'
+ 
++// BEGIN: For NUODB - search local repo also
++repositories {
++	mavenCentral()
++    mavenLocal()
++}
++// END: For NUODB
++
+ dependencies {
+     api project( ':hibernate-core' )
+     api project( ':hibernate-community-dialects' )
+@@ -40,6 +47,11 @@ dependencies {
+ 
+     api testLibs.log4j2
+ 
++// BEGIN: For NUODB
++    implementation    "com.nuodb.jdbc:nuodb-jdbc:${nuodbJdbcJarVersion}"
++    implementation    "com.nuodb.hibernate:nuodb-hibernate:${nuodbHibernateJarVersion}"
++// END: For NUODB
++
+     implementation libs.hibernateModels
+     implementation libs.jandex
+     implementation(libs.logging)
+diff --git a/local-build-plugins/src/main/groovy/local.databases.gradle b/local-build-plugins/src/main/groovy/local.databases.gradle
+index ab8d6578dd..b54ec2acbd 100644
+--- a/local-build-plugins/src/main/groovy/local.databases.gradle
++++ b/local-build-plugins/src/main/groovy/local.databases.gradle
+@@ -406,5 +406,14 @@ ext {
+                     'jdbc.url'   : 'jdbc:Altibase://' + dbHost + ':20300/mydb?force_clob_bind=true',
+                     'jdbc.datasource' : 'Altibase.jdbc.driver.AltibaseDriver'
+             ],
++            nuodb : [
++                    'db.dialect' : 'com.nuodb.hibernate.NuoDBDialect',
++                    'jdbc.driver': 'com.nuodb.hibernate.NuoHibernateDriver',
++                    'jdbc.user'  : 'hibernate_orm_test',
++                    'jdbc.pass'  : 'hibernate_orm_test',
++                    'connection.init_sql' : '',
++                    'jdbc.url'   : 'jdbc:com.nuodb.hib://' + dbHost + '/hibernate_orm_test?isolation=read_committed&lock-wait-timeout=10',
++                    'jdbc.datasource' : 'com.nuodb.jdbc.DataSource'
++            ],
+     ]
+ }
+diff --git a/local-build-plugins/src/main/java/org/hibernate/orm/antlr/AntlrHelper.java b/local-build-plugins/src/main/java/org/hibernate/orm/antlr/AntlrHelper.java
+index 1ec73679fe..0ea5864a04 100644
+--- a/local-build-plugins/src/main/java/org/hibernate/orm/antlr/AntlrHelper.java
++++ b/local-build-plugins/src/main/java/org/hibernate/orm/antlr/AntlrHelper.java
+@@ -52,7 +52,7 @@ private static void stripSillyGeneratedFromLineFromFile(
+ 			File generatedJavaFile,
+ 			File outputDirectory,
+ 			Project project) {
+-		project.getLogger().lifecycle( "Stripping silly generated-from line from {} into {}",
++		project.getLogger().debug( "Stripping silly generated-from line from {} into {}",
+ 				generatedJavaFile.getAbsolutePath(),
+ 				outputDirectory.getAbsolutePath() );
+ 
+diff --git a/settings.gradle b/settings.gradle
+index 03a875daf7..01de08a607 100644
+--- a/settings.gradle
++++ b/settings.gradle
+@@ -260,7 +260,7 @@ dependencyResolutionManagement {
+             library( "db2", "com.ibm.db2", "jcc" ).versionRef( db2Version )
+             library( "hana", "com.sap.cloud.db.jdbc", "ngdbc" ).versionRef( hanaVersion )
+             library( "sybase", "net.sourceforge.jtds", "jtds" ).versionRef( sybaseVersion )
+-            library("teradata", "com.teradata.jdbc", "terajdbc").versionRef(teradataVersion)
++            library( "teradata", "com.teradata.jdbc", "terajdbc").versionRef(teradataVersion)
+             library( "informix", "com.ibm.informix", "jdbc" ).versionRef( informixVersion )
+             library( "firebird", "org.firebirdsql.jdbc", "jaybird" ).versionRef( firebirdVersion )
+             library( "altibase", "com.altibase", "altibase-jdbc" ).versionRef( altibaseVersion )

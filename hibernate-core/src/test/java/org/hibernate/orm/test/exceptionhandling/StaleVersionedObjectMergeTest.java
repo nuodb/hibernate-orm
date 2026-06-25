@@ -132,7 +132,7 @@ public class StaleVersionedObjectMergeTest {
 		private long id;
 
 		@Version
-		@Column(name = "ver")
+		@Column(name = "xver") // NuoDB: 'ver' is reserved word
 		private int version;
 
 		public Long getId() {
@@ -158,7 +158,7 @@ public class StaleVersionedObjectMergeTest {
 		private long id;
 
 		@Version
-		@Column(name = "ver")
+		@Column(name = "xver") // NuoDB: 'ver' is reserved word
 		private Integer version;
 
 		public Long getId() {
@@ -176,7 +176,7 @@ public class StaleVersionedObjectMergeTest {
 		private long id;
 
 		@Version
-		@Column(name = "ver")
+		@Column(name = "xver") // NuoDB: 'ver' is reserved word
 		private Timestamp version;
 
 		public Long getId() {

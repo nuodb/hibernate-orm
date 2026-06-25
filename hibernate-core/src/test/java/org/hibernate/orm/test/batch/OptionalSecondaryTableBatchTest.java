@@ -100,7 +100,7 @@ public class OptionalSecondaryTableBatchTest {
 		private int id;
 
 		@Version
-		@Column( name = "ver" )
+		@Column( name = "xver") // NuoDB: ver reserved word
 		private int version;
 
 		private String name;

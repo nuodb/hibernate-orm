@@ -4,14 +4,23 @@
  */
 
 buildscript {
-//	repositories {
-//		mavenCentral()
-//	}
+	// BEGIN: For NUODB
+	// Set NuoDB JDBC JAR version
+	ext.nuodbJdbcJarVersion = "24.2.1";  // Any recent version will do
+	println("build.gradle: Using NuoDB JDBC JAR ${nuodbJdbcJarVersion} - edit file to change.")
+
+	// Look for our JARs locally
+	repositories {
+		mavenCentral()
+		mavenLocal()
+	}
+	// END: For NUODB
 
 	dependencies {
 //		classpath 'org.asciidoctor:asciidoctor-gradle-plugin:1.5.7'
 		classpath buildscriptLibs.forbiddenapis
 		classpath 'org.junit.platform:junit-platform-gradle-plugin:1.0.3'
+		classpath "com.nuodb.jdbc:nuodb-jdbc:${nuodbJdbcJarVersion}"  // For NUODB
 	}
 }
 
@@ -35,6 +44,36 @@ plugins {
 	id "com.dorongold.task-tree" version "4.0.1"
 }
 
+repositories {
+	mavenCentral()
+	mavenLocal()
+}
+
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// BEGIN: For NUODB
+
+// Tests take about 10 mins to compile and will then fail if the database is
+// unavailable or the dialect is wrong.  We do our own checks here to catch
+// such errors early. Make sure that 'SimpleDatabaseVersion.groovy' and
+// 'CheckNuoDBDatabaseAndVersion.groovy' exist in 'buildSrc/src/main/groovy'.
+
+// >> MAKE SURE THESE ARE VALID FOR THE CURRENT BRANCH
+String groovySrcDir = "${project.projectDir}/buildSrc/src/main/groovy";
+String databasesGradleFile = 'local-build-plugins/src/main/groovy/local.databases.gradle';
+
+if (!file(groovySrcDir).exists())
+	throw new RuntimeException("'${groovySrcDir}' not found - make it exists and copy"
+		+ ' SimpleDatabaseVersion.groovy and CheckNuoDBDatabaseAndVersion.groovy into it');
+
+var checker = //
+	new CheckNuoDBDatabaseAndVersion(com.nuodb.jdbc.DataSource.class) //
+		.validate(nuodbJdbcJarVersion, project, databasesGradleFile);
+
+// Save these away
+ext.nuodbHibernateJarVersion = checker.nuodbHibernateJarVersion;
+ext.nuodbVersion = checker.nuodbVersion;
+ext.nuodbDatabaseVersion = checker.nuodbDatabaseVersion;
+// END: For NUODB
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Releasing

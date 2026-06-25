@@ -158,7 +158,7 @@ public class LazyOneToOneRemoveFlushAccessTest {
 		private Integer id;
 
 		@OneToOne( fetch = FetchType.LAZY )
-		@JoinColumn( name = "containing" )
+		@JoinColumn( name = "xcontaining" ) // NuoDB: containing reserved word
 		private ContainingEntity containing;
 
 		public Integer getId() {
